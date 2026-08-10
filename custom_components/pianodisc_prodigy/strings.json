@@ -1,0 +1,107 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Connect your PianoDisc Prodigy II",
+        "description": "Enter the piano's IP address. Tip: if your piano already publishes MQTT, it can be discovered automatically instead.",
+        "data": {
+          "host": "IP address",
+          "name": "Name (optional)"
+        }
+      },
+      "discovery_confirm": {
+        "title": "PianoDisc Prodigy II discovered",
+        "description": "Do you want to set up {name}?"
+      },
+      "reconfigure": {
+        "title": "PianoDisc Prodigy II network settings",
+        "description": "Update the IP address for {name}. This must be the same piano.",
+        "data": {
+          "host": "IP address"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the piano at that address. Check the IP and that the piano is powered on.",
+      "wrong_device": "That address answered, but it is a different piano. Enter the IP of this piano."
+    },
+    "abort": {
+      "already_configured": "This piano is already set up.",
+      "invalid_discovery_info": "Discovery message was not recognized as a Prodigy II.",
+      "reconfigure_successful": "The piano's network settings were updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Power outlet",
+        "description": "Link the outlet or controller that powers this piano so Home Assistant can turn it on and off and show its power state. Only link an outlet dedicated to the piano — Home Assistant cuts its power when you turn the piano off. Leave empty to disable power control.",
+        "data": {
+          "power_switch": "Power outlet"
+        },
+        "data_description": {
+          "power_switch": "A switch, smart plug, outlet, or input boolean that controls power to the piano."
+        }
+      }
+    }
+  },
+  "services": {
+    "play_song": {
+      "name": "Play song",
+      "description": "Play a song by name on the piano, optionally setting the volume first and restoring it afterwards.",
+      "fields": {
+        "song": {
+          "name": "Song",
+          "description": "Name of the song to play (matched against the piano's library)."
+        },
+        "volume": {
+          "name": "Volume",
+          "description": "Optional volume to set before playing (0–100)."
+        },
+        "restore_volume_after": {
+          "name": "Restore volume after",
+          "description": "Restore the previous volume once the song has been started."
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "busy": { "name": "Keys active" }
+    },
+    "sensor": {
+      "library": {
+        "name": "Library",
+        "state_attributes": {
+          "scanning": { "name": "Scanning" }
+        }
+      }
+    },
+    "button": {
+      "reboot": { "name": "Reboot" },
+      "refresh_library": { "name": "Refresh library" }
+    },
+    "switch": {
+      "shuffle": { "name": "Shuffle" }
+    },
+    "update": {
+      "audio_firmware": { "name": "Audio firmware" },
+      "midi_firmware": { "name": "MIDI firmware" }
+    }
+  },
+  "exceptions": {
+    "song_not_found": {
+      "message": "No song matching '{song}' was found on the piano."
+    },
+    "power_on_timeout": {
+      "message": "Powered the outlet but the piano did not come online within {seconds} seconds. Check that the linked switch actually powers this piano."
+    }
+  },
+  "issues": {
+    "power_on_timeout": {
+      "title": "Piano did not power on",
+      "description": "Home Assistant switched on the linked outlet ({switch}) but {name} never came online. Check that the linked switch powers this piano and that the piano is connected to the network."
+    }
+  }
+}

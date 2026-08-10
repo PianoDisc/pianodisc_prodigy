@@ -1,0 +1,24 @@
+play_song:
+  target:
+    entity:
+      integration: pianodisc_prodigy
+      domain: media_player
+  fields:
+    song:
+      required: true
+      example: "Clair de Lune"
+      selector:
+        text:
+    volume:
+      required: false
+      example: 55
+      selector:
+        number:
+          min: 0
+          max: 100
+          mode: slider
+    restore_volume_after:
+      required: false
+      default: false
+      selector:
+        boolean:

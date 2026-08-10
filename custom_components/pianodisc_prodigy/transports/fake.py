@@ -1,0 +1,112 @@
+"""In-memory transport — runs the integration with no hardware.
+
+Used by the scaffold (so adding the config entry yields a working "piano" you can
+play with in the HA UI) and by the test suite (a real coordinator + real entities
+driven against a deterministic transport). It models the observable contract only:
+transport state, volume echo, shuffle, song list, and a simulated ``busy`` pulse on
+track load. It does NOT simulate UART/MQTT timing quirks — those belong in the real
+transports' own tests.
+"""
+
+from __future__ import annotations
+
+from homeassistant.components.media_player import MediaPlayerState
+
+from ..models import ProdigyData
+from . import Transport
+
+_DEMO_SONGS: list[str] = [
+    "Clair de Lune",
+    "Rhapsody in Blue",
+    "The Entertainer",
+    "Moonlight Sonata",
+    "Take Five",
+]
+_DEMO_PLAYLISTS: list[str] = ["Lobby Morning", "Dinner Service", "Late Night"]
+
+
+class FakeTransport(Transport):
+    """A deterministic, in-memory piano."""
+
+    def __init__(self, device_name: str = "Demo Prodigy") -> None:
+        super().__init__()
+        self.reboot_count = 0
+        self.song_fetch_count = 0
+        self._data = ProdigyData(
+            available=True,
+            state=MediaPlayerState.IDLE,
+            volume=40,
+            shuffle=False,
+            busy=False,
+            song=None,
+            song_index=None,
+            song_count=len(_DEMO_SONGS),
+            source=None,
+            source_list=list(_DEMO_PLAYLISTS),
+            device_name=device_name,
+            firmware_audio="0.4.7",
+            firmware_midi="1.3.5",
+        )
+
+    # -- lifecycle ----------------------------------------------------------
+    async def async_setup(self) -> None:
+        self._data = self._data.merge(available=True)
+
+    async def async_close(self) -> None:
+        return None
+
+    async def async_fetch_snapshot(self) -> ProdigyData:
+        return self._data
+
+    # -- helpers ------------------------------------------------------------
+    def _update(self, **changes: object) -> None:
+        self._data = self._data.merge(**changes)
+        self._emit(self._data)
+
+    # -- transport commands -------------------------------------------------
+    async def async_play(self, index: int | None = None) -> None:
+        if index is None or index < 0:
+            index = self._data.song_index if self._data.song_index is not None else 0
+        index = max(0, min(index, len(_DEMO_SONGS) - 1))
+        self._update(
+            state=MediaPlayerState.PLAYING,
+            song=_DEMO_SONGS[index],
+            song_index=index,
+        )
+
+    async def async_pause(self) -> None:
+        if self._data.state == MediaPlayerState.PLAYING:
+            self._update(state=MediaPlayerState.PAUSED)
+
+    async def async_stop(self) -> None:
+        # Real device does not clear .../song on stop; entities blank the title.
+        self._update(state=MediaPlayerState.IDLE)
+
+    async def async_next(self) -> None:
+        nxt = ((self._data.song_index or 0) + 1) % len(_DEMO_SONGS)
+        await self.async_play(nxt)
+
+    async def async_previous(self) -> None:
+        prv = ((self._data.song_index or 0) - 1) % len(_DEMO_SONGS)
+        await self.async_play(prv)
+
+    async def async_set_volume(self, level_1_100: int) -> None:
+        self._update(volume=max(1, min(100, int(level_1_100))))
+
+    async def async_set_shuffle(self, shuffle: bool) -> None:
+        self._update(shuffle=bool(shuffle))
+
+    async def async_select_playlist(self, name: str) -> None:
+        if name in self._data.source_list:
+            self._update(source=name)
+
+    async def async_reboot(self) -> None:
+        self.reboot_count += 1
+
+    # -- library reads ------------------------------------------------------
+    async def async_fetch_song_list(self, force: bool = False) -> list[str]:
+        self.song_fetch_count += 1
+        return list(_DEMO_SONGS)
+
+    async def async_fetch_playlists(self) -> list[str]:
+        return list(_DEMO_PLAYLISTS)
