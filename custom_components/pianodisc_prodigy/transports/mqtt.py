@@ -12,13 +12,15 @@ real-time overlay:
 * ``…/song`` → instant now-playing title,
 * ``…/ready`` / any message → availability (watchdog-driven offline).
 
-See device captures and the power-control design.
+See [[golden-capture]], [[power-architecture]].
 """
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 import json
+import uuid
 
 from homeassistant.components import mqtt
 from homeassistant.components.media_player import MediaPlayerState
@@ -28,12 +30,17 @@ from homeassistant.helpers.event import async_call_later
 
 from ..const import (
     BUSY_DEBOUNCE,
+    MAX_SCAN_PAGES,
     MQTT_PAYLOAD_OFFLINE,
     MQTT_TOPIC_BUSY,
     MQTT_TOPIC_COMMAND,
     MQTT_TOPIC_DEVICE_NAME,
+    MQTT_TOPIC_LIBRARY_PAGE,
+    MQTT_TOPIC_LIBRARY_REQUEST,
     MQTT_TOPIC_PAUSED,
     MQTT_TOPIC_PLAYING,
+    MQTT_TOPIC_PLAYLIST_REQUEST,
+    MQTT_TOPIC_PLAYLIST_STATE,
     MQTT_TOPIC_READY,
     MQTT_TOPIC_ROOT,
     MQTT_TOPIC_SONG,
@@ -41,13 +48,17 @@ from ..const import (
     MQTT_TOPIC_VOLUME,
     MQTT_TOPIC_VERSION,
     READY_WATCHDOG,
+    SONGLIST_PAGE_SIZE,
+    SONGLIST_TTL,
     SHUFFLE_HOLD_GRACE,
     SONG_UNKNOWN_GRACE,
     STOP_CONFIRM,
 )
 from ..models import ProdigyData
 from . import Transport
-from .http import HttpTransport
+from .http import HttpTransport, title_from_path
+
+_MQTT_LIBRARY_TIMEOUT = 12
 
 
 def _truthy(payload: object) -> bool:
@@ -78,6 +89,8 @@ class MqttTransport(Transport):
         self._http = http
         self._root = f"{MQTT_TOPIC_ROOT}/{device_id}"
         self._command_topic = f"{self._root}/{MQTT_TOPIC_COMMAND}"
+        self._library_request_topic = f"{self._root}/{MQTT_TOPIC_LIBRARY_REQUEST}"
+        self._playlist_request_topic = f"{self._root}/{MQTT_TOPIC_PLAYLIST_REQUEST}"
         self._data = ProdigyData()
         # State inputs. The displayed state is derived from these (see _derive_state).
         self._http_state: MediaPlayerState | None = None  # last /playerStatus state
@@ -96,6 +109,12 @@ class MqttTransport(Transport):
         self._unsubs: list[Callable[[], None]] = []
         self._cancel_watchdog: Callable[[], None] | None = None
         self._closed = False
+        self._library_waiters: dict[str, asyncio.Future[dict]] = {}
+        self._playlist_waiters: dict[str, asyncio.Future[dict]] = {}
+        self._song_titles: list[str] = []
+        self._song_cache_at: float | None = None
+        self._song_lock = asyncio.Lock()
+        self._playlist_names: list[str] = []
 
     # -- lifecycle ----------------------------------------------------------
     async def async_setup(self) -> None:
@@ -109,6 +128,8 @@ class MqttTransport(Transport):
             MQTT_TOPIC_DEVICE_NAME: self._on_device_name,
             MQTT_TOPIC_VERSION: self._on_version,
             MQTT_TOPIC_UPDATE: self._on_update,
+            MQTT_TOPIC_LIBRARY_PAGE: self._on_library_page,
+            MQTT_TOPIC_PLAYLIST_STATE: self._on_playlist_state,
         }
         for sub, handler in handlers.items():
             unsub = await mqtt.async_subscribe(
@@ -126,6 +147,11 @@ class MqttTransport(Transport):
             if cancel is not None:
                 cancel()
         self._cancel_watchdog = self._cancel_busy = None
+        for waiters in (self._library_waiters, self._playlist_waiters):
+            for fut in waiters.values():
+                if not fut.done():
+                    fut.cancel()
+            waiters.clear()
 
     # -- status overlay (MQTT push) ----------------------------------------
     @callback
@@ -251,6 +277,36 @@ class MqttTransport(Transport):
         if changes:
             changes["available"] = self._data.available
             self._push(**changes)
+
+    @callback
+    def _on_library_page(self, msg: ReceiveMessage) -> None:
+        try:
+            payload = json.loads(msg.payload)
+        except (ValueError, TypeError):
+            return
+        if not isinstance(payload, dict):
+            return
+        request_id = payload.get("id")
+        if not isinstance(request_id, str):
+            return
+        fut = self._library_waiters.pop(request_id, None)
+        if fut is not None and not fut.done():
+            fut.set_result(payload)
+
+    @callback
+    def _on_playlist_state(self, msg: ReceiveMessage) -> None:
+        try:
+            payload = json.loads(msg.payload)
+        except (ValueError, TypeError):
+            return
+        if not isinstance(payload, dict):
+            return
+        request_id = payload.get("id")
+        if not isinstance(request_id, str):
+            return
+        fut = self._playlist_waiters.pop(request_id, None)
+        if fut is not None and not fut.done():
+            fut.set_result(payload)
 
     @callback
     def _on_ready(self, msg: ReceiveMessage) -> None:
@@ -391,6 +447,35 @@ class MqttTransport(Transport):
             self._hass, self._command_topic, json.dumps({"command": command})
         )
 
+    async def _request_response(
+        self, topic: str, waiters: dict[str, asyncio.Future[dict]], payload: dict
+    ) -> dict | None:
+        request_id = uuid.uuid4().hex
+        payload = {"id": request_id, **payload}
+        fut: asyncio.Future[dict] = self._hass.loop.create_future()
+        waiters[request_id] = fut
+        await mqtt.async_publish(self._hass, topic, json.dumps(payload))
+        try:
+            return await asyncio.wait_for(fut, timeout=_MQTT_LIBRARY_TIMEOUT)
+        except asyncio.TimeoutError:
+            waiters.pop(request_id, None)
+            return None
+
+    def _songlist_fresh(self) -> bool:
+        if not self._song_titles or self._song_cache_at is None:
+            return False
+        return self._hass.loop.time() - self._song_cache_at < SONGLIST_TTL
+
+    async def _fetch_song_list_http_fallback(self, force: bool) -> list[str]:
+        if self._http is None:
+            return []
+        return await self._http.async_fetch_song_list(force=force)
+
+    async def _fetch_playlists_http_fallback(self) -> list[str]:
+        if self._http is None:
+            return []
+        return await self._http.async_fetch_playlists()
+
     async def async_play(self, index: int | None = None) -> None:
         # Verified live (2026-06-03): {"exec":"Play","params":N} is 0-based.
         self._optimistic_new_song()
@@ -443,9 +528,20 @@ class MqttTransport(Transport):
         self._push(shuffle=shuffle)
 
     async def async_select_playlist(self, name: str) -> None:
-        await self._publish(
-            {"type": "MIDIPlayer", "exec": "Playback", "params": {"playlist": name}}
-        )
+        if name not in self._playlist_names:
+            await self.async_fetch_playlists()
+        try:
+            index = self._playlist_names.index(name)
+        except ValueError:
+            await self._publish(
+                {"type": "MIDIPlayer", "exec": "Playback", "params": {"playlist": name}}
+            )
+        else:
+            await self._request_response(
+                self._playlist_request_topic,
+                self._playlist_waiters,
+                {"op": "play", "index": index},
+            )
         self._push(source=name)
 
     async def async_reboot(self) -> None:
@@ -497,13 +593,68 @@ class MqttTransport(Transport):
             self._http.set_library_progress_listener(listener)
 
     async def async_fetch_song_list(self, force: bool = False) -> list[str]:
-        if self._http is None:
-            return []
-        return await self._http.async_fetch_song_list(force=force)
+        if not force and self._songlist_fresh():
+            return list(self._song_titles)
+
+        async with self._song_lock:
+            if not force and self._songlist_fresh():
+                return list(self._song_titles)
+
+            titles: list[str] = []
+            seen: set[str] = set()
+            self._emit_library_progress(0, True)
+            try:
+                for page in range(MAX_SCAN_PAGES):
+                    payload = await self._request_response(
+                        self._library_request_topic,
+                        self._library_waiters,
+                        {"op": "scan", "page": page},
+                    )
+                    if not isinstance(payload, dict):
+                        break
+                    items = payload.get("items")
+                    if not isinstance(items, list):
+                        break
+                    new = 0
+                    page_paths: list[str] = []
+                    for item in items:
+                        if not isinstance(item, str):
+                            continue
+                        path = item.strip()
+                        if not path:
+                            continue
+                        page_paths.append(path)
+                        if path not in seen:
+                            seen.add(path)
+                            titles.append(title_from_path(path))
+                            new += 1
+                    self._emit_library_progress(len(titles), True)
+                    if new == 0 or len(page_paths) < SONGLIST_PAGE_SIZE:
+                        break
+            finally:
+                self._emit_library_progress(len(titles), False)
+
+            if not titles:
+                return await self._fetch_song_list_http_fallback(force=force)
+
+            self._song_titles = titles
+            self._song_cache_at = self._hass.loop.time()
+            return list(titles)
 
     async def async_fetch_playlists(self) -> list[str]:
-        if self._http is None:
-            return []
-        names = await self._http.async_fetch_playlists()
+        payload = await self._request_response(
+            self._playlist_request_topic,
+            self._playlist_waiters,
+            {"op": "get"},
+        )
+        names: list[str] = []
+        playlists = payload.get("playlists") if isinstance(payload, dict) else None
+        if isinstance(playlists, list):
+            for item in playlists:
+                if isinstance(item, dict) and isinstance(item.get("name"), str):
+                    names.append(item["name"])
+        if not names:
+            names = await self._fetch_playlists_http_fallback()
+        self._playlist_names = names
         self._push(source_list=names)
         return names

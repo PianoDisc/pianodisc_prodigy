@@ -1,6 +1,8 @@
 """Constants for the PianoDisc Prodigy II integration.
 
-Constants for local control, MQTT topics, polling cadence, and UI behavior.
+See the project planning memory ([[plan-review-v2]], [[mvp-v1-architecture]]) for the
+rationale behind these values. Anything marked TODO is a build-time item to confirm
+against real hardware (deviceID DEFAEE5C894F) before locking.
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ TRANSPORT_HTTP: Final = "http"
 TRANSPORT_FAKE: Final = "fake"  # in-memory transport for dev/tests/scaffold
 
 # MQTT contract (PianoDisc-Prodigy/<device_id>/...) -------------------------
+# Verified live 2026-05-29 against DEFAEE5C894F; see [[mqtt-contract]].
 MQTT_TOPIC_ROOT: Final = "PianoDisc-Prodigy"
 MQTT_TOPIC_COMMAND: Final = "player"  # HA -> piano JSON command envelope
 MQTT_TOPIC_DEVICE: Final = "device"  # HA -> piano (DebugJSON etc.)
@@ -46,6 +49,12 @@ MQTT_TOPIC_VERSION: Final = "version"
 # latest available firmware, from the device's own backend check (the HA
 # integration is public, so it can't hold the backend credential itself).
 MQTT_TOPIC_UPDATE: Final = "update"
+# CR#14: MQTT library/playlist request-response bridge. These remove the HTTP
+# dependency for Browse Media / playlist source discovery once matching firmware ships.
+MQTT_TOPIC_LIBRARY_REQUEST: Final = "library/request"
+MQTT_TOPIC_LIBRARY_PAGE: Final = "library/page"
+MQTT_TOPIC_PLAYLIST_REQUEST: Final = "playlist/request"
+MQTT_TOPIC_PLAYLIST_STATE: Final = "playlist/state"
 
 # Availability payloads on .../ready. CR#2: firmware registers an MQTT Last-Will of
 # "OFFLINE" (retained) so the broker announces an ungraceful disconnect instantly;
@@ -62,7 +71,7 @@ HTTP_REQUEST_TIMEOUT: Final = 10  # seconds, per request
 HTTP_SOCKET_LIMIT: Final = 2  # device caps at 3 open sockets; leave headroom
 
 # Prime-then-poll async-cache tuning (the library/status GETs are eventually
-# consistent with no completion signal — see device captures).
+# consistent with no completion signal — see [[golden-capture]]).
 PRIME_POLL_WAIT: Final = 0.5  # seconds between a prime (e.g. /scanSD) and the read
 MAX_SCAN_PAGES: Final = 50  # hard cap for paged /songlist scan (Repair if hit)
 SONGLIST_PAGE_SIZE: Final = 10  # entries in a full /scanSD page; a short page = the end
@@ -112,7 +121,7 @@ READY_WATCHDOG: Final = timedelta(seconds=75)
 
 # Power-link (optional dedicated outlet). When a switch is linked, TURN_ON energizes it
 # and waits up to POWER_ON_TIMEOUT for the piano to come online; TURN_OFF gracefully
-# stops, waits POWER_OFF_SETTLE, then de-energizes. See power-control design.
+# stops, waits POWER_OFF_SETTLE, then de-energizes. See [[power-architecture]].
 POWER_ON_TIMEOUT: Final = 90  # seconds to wait for the piano after energizing
 POWER_ON_POLL: Final = 3.0  # seconds between availability checks during that wait
 POWER_OFF_SETTLE: Final = 1.0  # seconds between the graceful Stop and cutting power
