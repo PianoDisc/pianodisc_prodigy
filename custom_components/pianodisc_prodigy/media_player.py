@@ -32,8 +32,6 @@ PARALLEL_UPDATES = 1
 # per-entity only when the user links a power outlet (see power-control design).
 # SELECT_SOURCE is intentionally omitted: playlists are browsed, not coerced into a
 # "source" (plan-review-v2).
-# PAUSE is intentionally omitted: the device's pause is laggy and *toggles*, so a user
-# double-taps a dead button and accidentally resumes — STOP is definitive + idempotent.
 # SHUFFLE_SET is intentionally omitted too: shuffle is a persistent device setting (the
 # firmware sort, on by default), so it lives on a dedicated switch entity that stays
 # toggleable when idle — the media card only renders its shuffle control during active
@@ -43,6 +41,7 @@ PARALLEL_UPDATES = 1
 # linked — both handled dynamically in supported_features().
 _SUPPORTED = (
     MediaPlayerEntityFeature.PLAY
+    | MediaPlayerEntityFeature.PAUSE
     | MediaPlayerEntityFeature.STOP
     | MediaPlayerEntityFeature.NEXT_TRACK
     | MediaPlayerEntityFeature.PREVIOUS_TRACK
