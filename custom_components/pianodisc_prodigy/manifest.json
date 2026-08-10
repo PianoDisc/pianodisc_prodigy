@@ -1,0 +1,19 @@
+{
+  "domain": "pianodisc_prodigy",
+  "name": "PianoDisc Prodigy II",
+  "after_dependencies": ["mqtt"],
+  "codeowners": ["@pdengr"],
+  "config_flow": true,
+  "dhcp": [
+    { "hostname": "prodigy2-*" },
+    { "hostname": "pianodisc-*" },
+    { "registered_devices": true }
+  ],
+  "documentation": "https://github.com/pianodisc/home-assistant-prodigy",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/pianodisc/home-assistant-prodigy/issues",
+  "mqtt": ["PianoDisc-Prodigy/+/ready"],
+  "requirements": [],
+  "version": "0.1.0"
+}

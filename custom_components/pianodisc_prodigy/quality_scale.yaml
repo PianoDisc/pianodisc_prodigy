@@ -1,0 +1,71 @@
+# Quality-scale tracker for pianodisc_prodigy. Target: gold (Works-with-HA).
+# The manifest `quality_scale` label is intentionally NOT set to "gold" yet — it is
+# added only once these rules are genuinely met (hassfest validates the claim in core).
+# Status: done | todo | exempt.
+rules:
+  # Bronze
+  config-flow: done
+  test-before-configure: todo  # real probe (GET /status.json) lands with HttpTransport
+  unique-config-entry: done
+  config-flow-test-coverage: todo
+  runtime-data: done
+  test-before-setup: todo
+  appropriate-polling: done
+  entity-unique-id: done
+  has-entity-name: done
+  entity-event-setup: todo
+  dependency-transparency: done
+  action-setup:
+    status: todo
+    comment: play_song is registered as a platform entity service; revisit if a non-entity service is added.
+  common-modules: done
+  docs-high-level-description: todo
+  docs-installation-instructions: todo
+  docs-removal-instructions: todo
+  docs-actions: todo
+  brands: todo  # home-assistant/brands PR (placeholder logo ready)
+
+  # Silver
+  entity-unavailable: done
+  integration-owner: done
+  action-exceptions: todo
+  reauthentication-flow:
+    status: exempt
+    comment: No credentials to re-auth — HTTP API is unauthenticated and MQTT creds belong to the core mqtt integration.
+  parallel-updates: done
+  test-coverage: todo
+  log-when-unavailable: todo
+  docs-configuration-parameters: todo
+  docs-installation-parameters: todo
+
+  # Gold
+  entity-translations: done
+  entity-device-class: todo  # busy -> RUNNING when the binary_sensor lands
+  devices: done
+  entity-category: todo  # diagnostic categories on reboot/firmware entities
+  entity-disabled-by-default: todo
+  discovery: done  # mqtt + dhcp matchers
+  stale-devices:
+    status: exempt
+    comment: One device per config entry; nothing to prune.
+  diagnostics: done
+  exception-translations: todo
+  icon-translations: todo
+  reconfiguration-flow: todo
+  dynamic-devices:
+    status: exempt
+    comment: One device per config entry.
+  discovery-update-info: done  # dhcp registered_devices keeps the IP current
+  repair-issues: todo  # power_on_timeout issue added; revisit for full coverage
+  docs-use-cases: todo
+  docs-supported-devices: todo
+  docs-supported-functions: todo
+  docs-data-update: todo
+  docs-known-limitations: todo
+  docs-troubleshooting: todo
+  docs-examples: todo
+
+  # Platinum (not required for cert)
+  async-dependency: todo
+  inject-websession: todo
+  strict-typing: todo
