@@ -24,13 +24,11 @@ Or clone this repository from Home Assistant:
 
 ```bash
 cd /config
-git clone https://github.com/OWNER/REPOSITORY.git pianodisc-prodigy-ha
+git clone https://github.com/PianoDisc/pianodisc_prodigy.git pianodisc-prodigy-ha
 mkdir -p custom_components
 cp -r pianodisc-prodigy-ha/custom_components/pianodisc_prodigy custom_components/
 ha core restart
 ```
-
-Replace `OWNER/REPOSITORY` with the public GitHub repository you create.
 
 ## HACS
 
