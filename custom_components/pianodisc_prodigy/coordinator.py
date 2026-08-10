@@ -192,7 +192,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         """Poll lightly when settled; faster while unreachable or still resolving."""
         if not data.available:
             interval = SCAN_INTERVAL_DISCONNECTED
-        elif data.state is None or data.volume is None:
+        elif data.state is None:
             interval = SCAN_INTERVAL_SYNCING
         elif data.state == MediaPlayerState.PLAYING and data.song is None:
             interval = (

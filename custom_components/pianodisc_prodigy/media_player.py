@@ -36,15 +36,15 @@ PARALLEL_UPDATES = 1
 # firmware sort, on by default), so it lives on a dedicated switch entity that stays
 # toggleable when idle — the media card only renders its shuffle control during active
 # playback, which made toggling it off one-way. See switch.py / device captures.
-# VOLUME_SET/STEP are added only once a real volume is known (the audio engine reports
-# 255 = "unknown" for ~1 min after boot) and TURN_ON/OFF only when a power outlet is
-# linked — both handled dynamically in supported_features().
+# TURN_ON/OFF are added only when a power outlet is linked.
 _SUPPORTED = (
     MediaPlayerEntityFeature.PLAY
     | MediaPlayerEntityFeature.PAUSE
     | MediaPlayerEntityFeature.STOP
     | MediaPlayerEntityFeature.NEXT_TRACK
     | MediaPlayerEntityFeature.PREVIOUS_TRACK
+    | MediaPlayerEntityFeature.VOLUME_SET
+    | MediaPlayerEntityFeature.VOLUME_STEP
     | MediaPlayerEntityFeature.BROWSE_MEDIA
     | MediaPlayerEntityFeature.PLAY_MEDIA
 )
@@ -108,13 +108,6 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
             features |= (
                 MediaPlayerEntityFeature.TURN_ON | MediaPlayerEntityFeature.TURN_OFF
             )
-        # Volume controls only once a real reading exists — hide the slider rather than
-        # show the false 100% the audio engine's 255 ("unknown") produces during sync.
-        if self.coordinator.data.volume is not None:
-            features |= (
-                MediaPlayerEntityFeature.VOLUME_SET
-                | MediaPlayerEntityFeature.VOLUME_STEP
-            )
         return features
 
     # -- state -------------------------------------------------------------
@@ -167,7 +160,9 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         # The device never clears .../song on stop; only surface it while playing. After
         # a (re)play the stale previous title is suppressed (transport sets song None)
         # until the new one is known → show a placeholder, not the old song.
-        if self.coordinator.data.state in _PLAYING_STATES:
+        if self.coordinator.data.state is MediaPlayerState.PAUSED:
+            return self.coordinator.data.song
+        if self.coordinator.data.state is MediaPlayerState.PLAYING:
             return self.coordinator.data.song or _SONG_LOADING
         return None
 
