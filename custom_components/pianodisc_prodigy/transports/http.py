@@ -116,7 +116,7 @@ class HttpTransport(Transport):
         }
 
     # -- snapshot (poll path) ----------------------------------------------
-    async def async_fetch_playback(self) -> ProdigyData:
+    async def async_fetch_playback(self, *, fetch_volume: bool = True) -> ProdigyData:
         """Light poll of the changing bits: /playerStatus + /getVolume (2 GETs).
 
         This is the regular MQTT-mode poll — kept light so it doesn't preempt the
@@ -124,7 +124,11 @@ class HttpTransport(Transport):
         rarely via :meth:`async_fetch_snapshot`.
         """
         player = await self._get_json("playerStatus")
-        volume = await self._get_json("getVolume")  # percent (0-100); the slider source
+        volume = (
+            await self._get_json("getVolume")
+            if fetch_volume
+            else None
+        )  # percent (0-100); the slider source
 
         state = song = song_index = song_count = shuffle = None
         if isinstance(player, dict):
