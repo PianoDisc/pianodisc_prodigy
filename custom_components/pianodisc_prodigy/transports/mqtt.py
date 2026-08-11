@@ -132,6 +132,8 @@ class MqttTransport(Transport):
         self._shuffle_hold_until = 0.0
         # After a (re)play, suppress this stale title until a new one appears.
         self._prev_song: str | None = None
+        self._last_status_song: str | None = None
+        self._pending_song_change = False
         self._song_grace_until = 0.0
         self._cancel_busy: Callable[[], None] | None = None
         self._unsubs: list[Callable[[], None]] = []
@@ -248,15 +250,16 @@ class MqttTransport(Transport):
         track_total = _positive_int(payload.get("track_total"))
         sort = payload.get("sort")
         duration = _positive_number(payload.get("duration"))
+        display_song = self._status_song_for_display(song)
         position = _non_negative_number(payload.get("position"))
         position_updated_at = dt_util.utcnow() if position is not None else None
-        if position is None:
+        if position is None and display_song is not None:
             position, position_updated_at = self._local_position_for_status(
                 state, song, duration
             )
         changes: dict[str, object] = {
             "available": self._avail(msg),
-            "song": self._resolve_song(song, live_mqtt=True),
+            "song": display_song,
             "song_index": _track_index(payload.get("track_index")),
             "song_count": track_total,
             "media_position": position,
@@ -267,6 +270,21 @@ class MqttTransport(Transport):
 
         self._mqtt_status_seen = True
         self._push(**changes)
+
+    def _status_song_for_display(self, song: str | None) -> str | None:
+        if song is None:
+            return None
+        if (
+            self._pending_song_change
+            and song == self._last_status_song
+            and self._hass.loop.time() < self._song_grace_until
+        ):
+            return None
+        self._pending_song_change = False
+        self._prev_song = None
+        self._song_grace_until = 0.0
+        self._last_status_song = song
+        return song
 
     def _estimated_media_position(self, now) -> float | None:
         position = self._data.media_position
@@ -432,8 +450,11 @@ class MqttTransport(Transport):
         used to clear only on a manual play from idle.
         """
         self._prev_song = self._data.song
+        if self._prev_song is not None:
+            self._last_status_song = self._prev_song
+        self._pending_song_change = True
         self._song_grace_until = self._hass.loop.time() + SONG_UNKNOWN_GRACE
-        self._push(song=None)
+        self._push(song=None, media_position=None, media_position_updated_at=None)
 
     def _optimistic_new_song(self) -> None:
         """On play/next/prev: optimistically PLAYING + clear the now-stale title."""
@@ -492,6 +513,8 @@ class MqttTransport(Transport):
         self._shuffle_target = None
         self._shuffle_hold_until = 0.0
         self._prev_song = None
+        self._last_status_song = None
+        self._pending_song_change = False
         self._song_grace_until = 0.0
         self._data = self._data.merge(
             available=False,
