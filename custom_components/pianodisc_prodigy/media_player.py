@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.media_player import (
@@ -144,9 +145,16 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
+        attrs: dict[str, Any] = {}
         if self.coordinator.power_linked:
-            return {"power_switch": self.coordinator.power_switch}
-        return None
+            attrs["power_switch"] = self.coordinator.power_switch
+        data = self.coordinator.data
+        if data.state in _PLAYING_STATES:
+            if data.song_index is not None:
+                attrs["track_index"] = data.song_index + 1
+            if data.song_count is not None:
+                attrs["track_total"] = data.song_count
+        return attrs or None
 
     @property
     def volume_level(self) -> float | None:
@@ -162,9 +170,9 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         # While getting ready, show a clear status line instead of a missing title.
         if self.coordinator.getting_ready:
             return _STARTING_TITLE
-        # The device never clears .../song on stop; only surface it while playing. After
-        # a (re)play the stale previous title is suppressed (transport sets song None)
-        # until the new one is known → show a placeholder, not the old song.
+        # The device may retain the last title on stop; only surface it while playing.
+        # After a (re)play the stale previous title is suppressed (transport sets song
+        # None) until the new one is known → show a placeholder, not the old song.
         if self.coordinator.data.state is MediaPlayerState.PAUSED:
             return self.coordinator.data.song
         if self.coordinator.data.state is MediaPlayerState.PLAYING:
@@ -178,6 +186,27 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         data = self.coordinator.data
         if data.state in _PLAYING_STATES and data.song_index is not None:
             return str(data.song_index)
+        return None
+
+    @property
+    def media_duration(self) -> float | None:
+        data = self.coordinator.data
+        if data.state in _PLAYING_STATES:
+            return data.media_duration
+        return None
+
+    @property
+    def media_position(self) -> float | None:
+        data = self.coordinator.data
+        if data.state in _PLAYING_STATES:
+            return data.media_position
+        return None
+
+    @property
+    def media_position_updated_at(self) -> datetime | None:
+        data = self.coordinator.data
+        if data.state is MediaPlayerState.PLAYING and data.media_position is not None:
+            return data.media_position_updated_at
         return None
 
     # -- commands ----------------------------------------------------------

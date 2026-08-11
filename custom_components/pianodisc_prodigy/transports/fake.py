@@ -96,6 +96,8 @@ class FakeTransport(Transport):
             state=MediaPlayerState.PLAYING,
             song=_DEMO_SONGS[index],
             song_index=index,
+            media_position=0,
+            media_duration=180,
         )
 
     async def async_pause(self) -> None:
