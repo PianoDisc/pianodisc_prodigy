@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from homeassistant.components.http import StaticPathConfig
+from homeassistant.components.panel_custom import async_register_panel
 from homeassistant.components import mqtt
 from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.setup import async_setup_component
 
-from .const import CONF_DEVICE_ID, LOGGER
+from .const import CONF_DEVICE_ID, DOMAIN, LOGGER
 from .coordinator import PianoDiscConfigEntry, PianoDiscCoordinator
 from .transports import Transport
 from .transports.http import HttpTransport
 from .transports.mqtt import MqttTransport
+from .websocket import async_register_websocket_api
 
 # Remaining aux platforms (event, autoplay select) land next.
 PLATFORMS: list[Platform] = [
@@ -28,6 +34,7 @@ PLATFORMS: list[Platform] = [
 
 async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> bool:
     """Set up PianoDisc Prodigy II from a config entry."""
+    await _async_register_playlist_editor(hass)
     transport = await _async_build_transport(hass, entry)
     LOGGER.debug("Using transport %s for %s", type(transport).__name__, entry.title)
 
@@ -48,6 +55,36 @@ async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) ->
         "pianodisc_prodigy_library_prefetch",
     )
     return True
+
+
+async def _async_register_playlist_editor(hass: HomeAssistant) -> None:
+    """Expose the user-facing playlist editor panel and its websocket API."""
+    data = hass.data.setdefault(DOMAIN, {})
+    if data.get("playlist_editor_registered"):
+        return
+    await async_setup_component(hass, "http", {})
+    await async_setup_component(hass, "frontend", {})
+    async_register_websocket_api(hass)
+    frontend_dir = Path(__file__).with_name("frontend")
+    await hass.http.async_register_static_paths(
+        [
+            StaticPathConfig(
+                f"/{DOMAIN}/playlist-panel.js",
+                str(frontend_dir / "playlist-panel.js"),
+                cache_headers=False,
+            )
+        ]
+    )
+    await async_register_panel(
+        hass,
+        frontend_url_path="pianodisc-playlists",
+        webcomponent_name="pianodisc-playlist-panel",
+        sidebar_title="Piano Playlists",
+        sidebar_icon="mdi:playlist-music",
+        module_url=f"/{DOMAIN}/playlist-panel.js",
+        require_admin=False,
+    )
+    data["playlist_editor_registered"] = True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> bool:
