@@ -23,6 +23,7 @@ _DEMO_SONGS: list[str] = [
     "Take Five",
 ]
 _DEMO_PLAYLISTS: list[str] = ["Lobby Morning", "Dinner Service", "Late Night"]
+_DEMO_SONG_PATHS: list[str] = [f"/sd/{song}.mid" for song in _DEMO_SONGS]
 
 
 class FakeTransport(Transport):
@@ -47,6 +48,15 @@ class FakeTransport(Transport):
             firmware_audio="0.4.7",
             firmware_midi="1.3.5",
         )
+        self.playlists: list[dict[str, object]] = [
+            {
+                "name": name,
+                "sort": "Shuffle",
+                "repeat": 1,
+                "content": {"include": [], "exclude": []},
+            }
+            for name in _DEMO_PLAYLISTS
+        ]
 
     # -- lifecycle ----------------------------------------------------------
     async def async_setup(self) -> None:
@@ -108,5 +118,21 @@ class FakeTransport(Transport):
         self.song_fetch_count += 1
         return list(_DEMO_SONGS)
 
+    async def async_fetch_song_paths(self, force: bool = False) -> list[str]:
+        return list(_DEMO_SONG_PATHS)
+
     async def async_fetch_playlists(self) -> list[str]:
-        return list(_DEMO_PLAYLISTS)
+        return [
+            item["name"]
+            for item in self.playlists
+            if isinstance(item.get("name"), str)
+        ]
+
+    async def async_fetch_playlist_definitions(self) -> list[dict[str, object]]:
+        return [dict(item) for item in self.playlists]
+
+    async def async_save_playlist_definitions(
+        self, playlists: list[dict[str, object]]
+    ) -> None:
+        self.playlists = [dict(item) for item in playlists]
+        self._update(source_list=await self.async_fetch_playlists())
