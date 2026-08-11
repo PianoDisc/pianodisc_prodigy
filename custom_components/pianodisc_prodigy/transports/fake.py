@@ -50,12 +50,26 @@ class FakeTransport(Transport):
         )
         self.playlists: list[dict[str, object]] = [
             {
-                "name": name,
+                "name": "Lobby Morning",
                 "sort": "Shuffle",
                 "repeat": 1,
                 "content": {"include": [], "exclude": []},
-            }
-            for name in _DEMO_PLAYLISTS
+            },
+            {
+                "name": "Dinner Service",
+                "sort": "Shuffle",
+                "repeat": 1,
+                "content": {
+                    "include": ["/sd/Clair de Lune.mid", "/sd/Take Five.mid"],
+                    "exclude": [],
+                },
+            },
+            {
+                "name": "Late Night",
+                "sort": "Shuffle",
+                "repeat": 1,
+                "content": {"include": [], "exclude": ["/sd/The Entertainer.mid"]},
+            },
         ]
 
     # -- lifecycle ----------------------------------------------------------
