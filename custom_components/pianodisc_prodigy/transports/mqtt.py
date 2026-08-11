@@ -1,15 +1,12 @@
-"""MQTT transport — a real-time overlay on an authoritative HTTP poll.
+"""MQTT transport — command/status transport with HTTP fallback when available.
 
-Wire reality (live-captured 2026-06-08): during hospitality autoplay the piano keeps
-``…/playing`` FALSE and only toggles ``…/busy`` (per-note solenoid bursts); ``…/song``
-and ``…/volume`` publish on change only; and ``…/volume`` is a **MIDI 0-127** value, not
-the percent a slider needs. The piano's HTTP API is authoritative — ``/playerStatus``
-reports the real ``state`` (0/1/2) during autoplay and ``/getVolume`` is the percent
-volume. So in MQTT mode we **poll HTTP for state/song/volume** and use MQTT as the
-real-time overlay:
+Newer firmware publishes the raw ``/playerStatus`` JSON on ``…/player/status``. Once
+that topic is seen, MQTT is the primary source for playback state/song/progress and HTTP
+only backfills metadata/legacy gaps. Older firmware can still run with the historical
+split status topics plus the composed HTTP poll.
 
 * ``…/busy`` → instant "playing" (HTTP then confirms + sustains it through busy's gaps),
-* ``…/song`` → instant now-playing title,
+* ``…/player/status`` → full now-playing snapshot,
 * ``…/ready`` / any message → availability (watchdog-driven offline).
 
 See [[golden-capture]], [[power-architecture]].
@@ -27,6 +24,7 @@ from homeassistant.components.media_player import MediaPlayerState
 from homeassistant.components.mqtt import ReceiveMessage
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_call_later
+from homeassistant.util import dt as dt_util
 
 from ..const import (
     BUSY_DEBOUNCE,
@@ -37,13 +35,11 @@ from ..const import (
     MQTT_TOPIC_DEVICE_NAME,
     MQTT_TOPIC_LIBRARY_PAGE,
     MQTT_TOPIC_LIBRARY_REQUEST,
-    MQTT_TOPIC_PAUSED,
-    MQTT_TOPIC_PLAYING,
+    MQTT_TOPIC_PLAYER_STATUS,
     MQTT_TOPIC_PLAYLIST_REQUEST,
     MQTT_TOPIC_PLAYLIST_STATE,
     MQTT_TOPIC_READY,
     MQTT_TOPIC_ROOT,
-    MQTT_TOPIC_SONG,
     MQTT_TOPIC_UPDATE,
     MQTT_TOPIC_VOLUME,
     MQTT_TOPIC_VERSION,
@@ -60,6 +56,12 @@ from .http import HttpTransport, title_from_path
 
 _MQTT_LIBRARY_TIMEOUT = 12
 
+_STATE_MAP: dict[int, MediaPlayerState] = {
+    0: MediaPlayerState.IDLE,
+    1: MediaPlayerState.PLAYING,
+    2: MediaPlayerState.PAUSED,
+}
+
 
 def _truthy(payload: object) -> bool:
     """`TRUE`/`FALSE` (any case) -> bool. The device uses uppercase strings."""
@@ -75,8 +77,29 @@ def _percent_volume(payload: object) -> int | None:
     return volume if 0 <= volume <= 100 else None
 
 
+def _int_value(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _positive_int(value: object) -> int | None:
+    parsed = _int_value(value)
+    return parsed if parsed is not None and parsed > 0 else None
+
+
+def _non_negative_number(value: object) -> float | None:
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0:
+        return float(value)
+    return None
+
+
+def _positive_number(value: object) -> float | None:
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
+        return float(value)
+    return None
+
+
 class MqttTransport(Transport):
-    """MQTT real-time overlay; state/song/volume polled from the composed HTTP."""
+    """MQTT command/status transport, optionally backed by HTTP for legacy gaps."""
 
     def __init__(
         self,
@@ -96,9 +119,9 @@ class MqttTransport(Transport):
         self._http_state: MediaPlayerState | None = None  # last /playerStatus state
         self._busy_until = 0.0  # busy counts as "playing" until this loop time
         self._stopped = False  # a Stop we issued holds IDLE until play / confirmed idle
-        self._paused = False  # MQTT …/paused
-        self._playing = False  # MQTT …/playing (rarely TRUE; busy is the real signal)
-        self._mqtt_song: str | None = None
+        self._paused = False
+        self._playing = False
+        self._mqtt_status_seen = False
         self._mqtt_volume_seen = False
         self._shuffle_target: bool | None = None
         self._shuffle_hold_until = 0.0
@@ -121,10 +144,8 @@ class MqttTransport(Transport):
     # -- lifecycle ----------------------------------------------------------
     async def async_setup(self) -> None:
         handlers = {
-            MQTT_TOPIC_PLAYING: self._on_playing,
-            MQTT_TOPIC_PAUSED: self._on_paused,
             MQTT_TOPIC_BUSY: self._on_busy,
-            MQTT_TOPIC_SONG: self._on_song,
+            MQTT_TOPIC_PLAYER_STATUS: self._on_player_status,
             MQTT_TOPIC_VOLUME: self._on_volume,
             MQTT_TOPIC_READY: self._on_ready,
             MQTT_TOPIC_DEVICE_NAME: self._on_device_name,
@@ -166,28 +187,6 @@ class MqttTransport(Transport):
         return True if not msg.retain else self._data.available
 
     @callback
-    def _on_playing(self, msg: ReceiveMessage) -> None:
-        playing = _truthy(msg.payload)
-        ended = (
-            self._playing and not playing
-        )  # a song just finished (autoplay gap / stop)
-        self._playing = playing
-        if ended:
-            # Suppress the just-ended title so the card shows "Loading…" between
-            # autoplay songs (not the old one) until the next …/song arrives.
-            self._suppress_current_title()
-        else:
-            self._push(available=self._avail(msg))
-
-    @callback
-    def _on_paused(self, msg: ReceiveMessage) -> None:
-        self._paused = _truthy(msg.payload)
-        if self._paused:
-            self._prev_song = None
-            self._song_grace_until = 0.0
-        self._push(available=self._avail(msg))
-
-    @callback
     def _on_busy(self, msg: ReceiveMessage) -> None:
         busy = _truthy(msg.payload)
         if msg.retain:
@@ -212,9 +211,56 @@ class MqttTransport(Transport):
         self._push()
 
     @callback
-    def _on_song(self, msg: ReceiveMessage) -> None:
-        self._mqtt_song = str(msg.payload).strip() or None
-        self._push(song=self._resolve_song(self._mqtt_song), available=self._avail(msg))
+    def _on_player_status(self, msg: ReceiveMessage) -> None:
+        try:
+            payload = json.loads(msg.payload)
+        except (ValueError, TypeError):
+            return
+        if not isinstance(payload, dict):
+            return
+
+        raw_state = _int_value(payload.get("state"))
+        state = _STATE_MAP.get(raw_state) if raw_state is not None else None
+        if state is not None:
+            self._http_state = state
+            self._paused = state is MediaPlayerState.PAUSED
+            self._playing = state is MediaPlayerState.PLAYING
+            if state is not MediaPlayerState.PLAYING:
+                self._busy_until = 0.0
+                if self._cancel_busy is not None:
+                    self._cancel_busy()
+                    self._cancel_busy = None
+            if state is MediaPlayerState.IDLE:
+                self._stopped = False
+
+        raw_song = payload.get("song")
+        song = (
+            title_from_path(raw_song)
+            if isinstance(raw_song, str) and raw_song.strip()
+            else None
+        )
+
+        track_total = _positive_int(payload.get("track_total", payload.get("length")))
+        sort = payload.get("sort")
+        changes: dict[str, object] = {
+            "available": self._avail(msg),
+            "song": self._resolve_song(song, live_mqtt=True),
+            "song_index": _int_value(payload.get("track_index", payload.get("index"))),
+            "song_count": track_total,
+            "media_position": _non_negative_number(
+                payload.get("position", payload.get("elapsed"))
+            ),
+            "media_duration": _positive_number(
+                payload.get("duration", payload.get("track_duration"))
+            ),
+            "shuffle": self._resolve_shuffle((sort == 1) if sort is not None else None),
+        }
+        changes["media_position_updated_at"] = (
+            dt_util.utcnow() if changes["media_position"] is not None else None
+        )
+
+        self._mqtt_status_seen = True
+        self._push(**changes)
 
     @callback
     def _on_device_name(self, msg: ReceiveMessage) -> None:
@@ -327,10 +373,14 @@ class MqttTransport(Transport):
     def _busy_active(self) -> bool:
         return self._hass.loop.time() < self._busy_until
 
-    def _resolve_song(self, observed: str | None) -> str | None:
+    def _resolve_song(self, observed: str | None, *, live_mqtt: bool = False) -> str | None:
         """Suppress the pre-(re)play title until a genuinely new one appears."""
         if observed is None:
             return None
+        if live_mqtt:
+            self._prev_song = None
+            self._song_grace_until = 0.0
+            return observed
         within_grace = self._hass.loop.time() < self._song_grace_until
         if observed == self._prev_song and within_grace:
             return None  # still the song from before play → caller shows a placeholder
@@ -347,7 +397,6 @@ class MqttTransport(Transport):
         """
         self._prev_song = self._data.song
         self._song_grace_until = self._hass.loop.time() + SONG_UNKNOWN_GRACE
-        self._mqtt_song = None
         self._push(song=None)
 
     def _optimistic_new_song(self) -> None:
@@ -374,8 +423,7 @@ class MqttTransport(Transport):
             return MediaPlayerState.PAUSED
         # Solenoid activity is the real-time truth, checked BEFORE the stop-hold: a
         # missed Stop (keys still striking) stays PLAYING so the user can retry, not a
-        # false Idle. Autoplay never sets …/playing, so busy is the signal; it also
-        # covers boot before /playerStatus is responsive.
+        # false Idle. Busy also covers boot before /playerStatus is responsive.
         if self._playing or self._busy_active():
             return MediaPlayerState.PLAYING
         if self._http_state is MediaPlayerState.PAUSED:
@@ -403,7 +451,7 @@ class MqttTransport(Transport):
         self._playing = self._paused = self._stopped = False
         self._busy_until = 0.0
         self._http_state = None
-        self._mqtt_song = None
+        self._mqtt_status_seen = False
         self._mqtt_volume_seen = False
         self._shuffle_target = None
         self._shuffle_hold_until = 0.0
@@ -414,6 +462,9 @@ class MqttTransport(Transport):
             state=None,
             song=None,
             song_index=None,
+            media_position=None,
+            media_duration=None,
+            media_position_updated_at=None,
             volume=None,
             busy=None,
         )
@@ -551,32 +602,42 @@ class MqttTransport(Transport):
         if self._http is not None:
             await self._http.async_reboot()
 
-    # -- snapshot (authoritative HTTP poll) + library ----------------------
+    # -- snapshot (HTTP fallback/backfill) + library -----------------------
     async def async_fetch_snapshot(self) -> ProdigyData:
         if self._http is not None:
             playback = await self._http.async_fetch_playback(
                 fetch_volume=not self._mqtt_volume_seen
             )
-            if playback.available:  # piano answered → its state/song/volume are truth
-                self._http_state = playback.state
-                if playback.state == MediaPlayerState.IDLE:
-                    self._stopped = (
-                        False  # device confirms idle → release the stop hold
-                    )
+            if playback.available:
                 volume = (
                     self._data.volume
                     if self._mqtt_volume_seen or playback.volume is None
                     else playback.volume
                 )
-                merged = self._data.merge(
-                    available=True,
-                    volume=volume,
-                    song=self._resolve_song(self._mqtt_song or playback.song),
-                    song_index=playback.song_index,
-                    song_count=playback.song_count,
-                    shuffle=self._resolve_shuffle(playback.shuffle),
-                    source_list=playback.source_list or self._data.source_list,
-                )
+                if self._mqtt_status_seen:
+                    merged = self._data.merge(
+                        available=True,
+                        volume=volume,
+                        source_list=playback.source_list or self._data.source_list,
+                    )
+                else:
+                    self._http_state = playback.state
+                    if playback.state == MediaPlayerState.IDLE:
+                        self._stopped = (
+                            False  # device confirms idle → release the stop hold
+                        )
+                    merged = self._data.merge(
+                        available=True,
+                        volume=volume,
+                        song=self._resolve_song(playback.song),
+                        song_index=playback.song_index,
+                        song_count=playback.song_count,
+                        media_position=playback.media_position,
+                        media_duration=playback.media_duration,
+                        media_position_updated_at=playback.media_position_updated_at,
+                        shuffle=self._resolve_shuffle(playback.shuffle),
+                        source_list=playback.source_list or self._data.source_list,
+                    )
                 if merged.firmware_audio is None:  # firmware is static → fetch once
                     info = await self._http.async_get_device_info()
                     if info:

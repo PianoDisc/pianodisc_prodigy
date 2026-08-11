@@ -35,11 +35,9 @@ MQTT_TOPIC_COMMAND: Final = "player"  # HA -> piano JSON command envelope
 MQTT_TOPIC_DEVICE: Final = "device"  # HA -> piano (DebugJSON etc.)
 MQTT_TOPIC_READY: Final = "ready"  # retained availability: "OK" online / "OFFLINE" via Last-Will
 # P1 firmware makes these slow-moving status topics retained and truthful.
-MQTT_TOPIC_PLAYING: Final = "playing"  # "TRUE"/"FALSE" transport state
-MQTT_TOPIC_PAUSED: Final = "paused"  # "TRUE"/"FALSE"
 MQTT_TOPIC_BUSY: Final = "busy"  # "TRUE"/"FALSE" (solenoids striking)
 MQTT_TOPIC_VOLUME: Final = "volume"  # percent string "0".."100" (not MIDI 0..127)
-MQTT_TOPIC_SONG: Final = "song"  # raw UTF-8 title; cleared on P1 firmware
+MQTT_TOPIC_PLAYER_STATUS: Final = "player/status"  # retained /playerStatus JSON
 MQTT_TOPIC_DEVICE_NAME: Final = "deviceName"
 MQTT_TOPIC_MSC: Final = "msc"  # JSON {"command":"GO|STOP|FIRE","cue":"NNN"}
 # CR#3: retained {"audio":"x.y.z","midi":"x.y.z"} so MQTT-only installs (no HTTP
@@ -126,9 +124,8 @@ POWER_ON_TIMEOUT: Final = 90  # seconds to wait for the piano after energizing
 POWER_ON_POLL: Final = 3.0  # seconds between availability checks during that wait
 POWER_OFF_SETTLE: Final = 1.0  # seconds between the graceful Stop and cutting power
 
-# Autoplay publishes only .../busy (per-note solenoid bursts), never .../playing TRUE,
-# so busy is the real "is playing" signal. Hold PLAYING this long after the last burst
-# so the per-note flapping doesn't bounce the state (verified live 2026-06-08).
+# Autoplay publishes per-note .../busy bursts. Hold PLAYING this long after the last
+# burst so the per-note flapping doesn't bounce the state (verified live 2026-06-08).
 BUSY_DEBOUNCE: Final = 10.0  # seconds
 
 # After a Stop, hold PLAYING at most this long and let …/busy verify the result: if keys

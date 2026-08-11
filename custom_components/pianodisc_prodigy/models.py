@@ -8,6 +8,7 @@ Adding or swapping a transport never touches entity code.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from datetime import datetime
 
 from homeassistant.components.media_player import MediaPlayerState
 
@@ -26,6 +27,9 @@ class ProdigyData:
     song: str | None = None  # raw device title; entities blank it when idle
     song_index: int | None = None  # position in the cached song list (best-effort)
     song_count: int | None = None  # total songs (best-effort)
+    media_position: float | None = None  # elapsed seconds in current song
+    media_duration: float | None = None  # total seconds in current song
+    media_position_updated_at: datetime | None = None
     volume: int | None = None  # device scale 1..100 (None = unknown)
     shuffle: bool | None = None
     busy: bool | None = None  # solenoids actively striking (MQTT only)

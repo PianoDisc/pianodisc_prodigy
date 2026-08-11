@@ -15,6 +15,7 @@ from typing import Any
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
 from homeassistant.components.media_player import MediaPlayerState
+from homeassistant.util import dt as dt_util
 
 from ..const import (
     DEBUG_KEY_AUDIO_VERSION,
@@ -47,6 +48,18 @@ def title_from_path(path: str) -> str:
     if name.lower().endswith(".mid"):
         name = name[:-4]
     return name
+
+
+def _positive_number(value: object) -> float | None:
+    if isinstance(value, (int, float)) and value > 0:
+        return float(value)
+    return None
+
+
+def _non_negative_number(value: object) -> float | None:
+    if isinstance(value, (int, float)) and value >= 0:
+        return float(value)
+    return None
 
 
 class HttpTransport(Transport):
@@ -136,6 +149,7 @@ class HttpTransport(Transport):
         )  # percent (0-100); the slider source
 
         state = song = song_index = song_count = shuffle = None
+        media_position = media_duration = None
         if isinstance(player, dict):
             state = _STATE_MAP.get(player.get("state"))
             raw_song = player.get("song")
@@ -145,8 +159,14 @@ class HttpTransport(Transport):
                 else None
             )
             song_index = player.get("index")
-            length = player.get("length")
+            length = player.get("track_total", player.get("length"))
             song_count = length if isinstance(length, int) and length > 0 else None
+            media_position = _non_negative_number(
+                player.get("position", player.get("elapsed"))
+            )
+            media_duration = _positive_number(
+                player.get("duration", player.get("track_duration"))
+            )
             sort = player.get("sort")
             shuffle = (sort == 1) if sort is not None else None
 
@@ -158,6 +178,11 @@ class HttpTransport(Transport):
             song=song,
             song_index=song_index,
             song_count=song_count,
+            media_position=media_position,
+            media_duration=media_duration,
+            media_position_updated_at=(
+                dt_util.utcnow() if media_position is not None else None
+            ),
             # 0-100 percent; the audio engine returns 255 ("unknown") for ~1 min after
             # boot until it syncs with the MIDI engine — treat out-of-range as unknown.
             volume=vol if isinstance(vol, int) and 0 <= vol <= 100 else None,
