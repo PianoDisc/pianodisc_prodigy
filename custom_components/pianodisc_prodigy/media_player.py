@@ -29,13 +29,13 @@ PARALLEL_UPDATES = 1
 
 # Features actually backed by a device control. NB: no REPEAT_SET (no transport repeat
 # exists), no VOLUME_MUTE (SetMute is a firmware no-op). TURN_ON/TURN_OFF are added
-# per-entity only when the user links a power outlet (see power-control design).
+# per-entity only when the user links a power outlet (see [[power-architecture]]).
 # SELECT_SOURCE is intentionally omitted: playlists are browsed, not coerced into a
 # "source" (plan-review-v2).
 # SHUFFLE_SET is intentionally omitted too: shuffle is a persistent device setting (the
 # firmware sort, on by default), so it lives on a dedicated switch entity that stays
 # toggleable when idle — the media card only renders its shuffle control during active
-# playback, which made toggling it off one-way. See switch.py / device captures.
+# playback, which made toggling it off one-way. See switch.py / [[golden-capture]].
 # TURN_ON/OFF are added only when a power outlet is linked.
 _SUPPORTED = (
     MediaPlayerEntityFeature.PLAY
@@ -61,8 +61,11 @@ _STARTING_TITLE = "Getting ready…"
 # Shown while playing but the new song's name isn't known yet (instead of the old one).
 _SONG_LOADING = "Loading…"
 
-# Root node id/type for the flat song-library browse tree.
+# Root node ids/types for the SD-card browse tree.
 _BROWSE_ROOT = "library"
+_BROWSE_SONGS = "library:songs"
+_BROWSE_PLAYLISTS = "library:playlists"
+_PLAYLIST_ID_PREFIX = "playlist:"
 
 
 async def async_setup_entry(
@@ -103,7 +106,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
     @property
     def supported_features(self) -> MediaPlayerEntityFeature:
         features = _SUPPORTED
-        # TURN_ON/TURN_OFF only when a power outlet is linked (power-control design).
+        # TURN_ON/TURN_OFF only when a power outlet is linked ([[power-architecture]]).
         if self.coordinator.power_linked:
             features |= (
                 MediaPlayerEntityFeature.TURN_ON | MediaPlayerEntityFeature.TURN_OFF
@@ -119,7 +122,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
             return MediaPlayerState.OFF
         # Linked + powered on but not reporting yet → "getting ready" (booting). We know
         # it's on (the switch), so present as ON with a "Getting ready…" title rather
-        # than a false Idle/Playing. See power-control design.
+        # than a false Idle/Playing. See [[power-architecture]].
         if coordinator.getting_ready:
             return MediaPlayerState.ON
         return coordinator.data.state
@@ -129,7 +132,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         coordinator = self.coordinator
         # With a linked outlet the switch is the power authority: stay available while
         # powered off so the card shows OFF with a working power button rather than
-        # greying out (which would hide turn-on). See power-control design.
+        # greying out (which would hide turn-on). See [[power-architecture]].
         if coordinator.power_linked and coordinator.power_on is False:
             return True
         # Stay available (showing "getting ready") through the power-on/boot window.
@@ -209,17 +212,45 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         media_content_type: str | None = None,
         media_content_id: str | None = None,
     ) -> BrowseMedia:
-        """Browse the SD-card library as a flat list of playable songs.
+        """Browse the SD-card library as songs plus playable playlists."""
+        if media_content_id == _BROWSE_SONGS:
+            return await self._browse_songs()
+        if media_content_id == _BROWSE_PLAYLISTS:
+            return await self._browse_playlists()
+        return BrowseMedia(
+            title="Piano library",
+            media_class=MediaClass.DIRECTORY,
+            media_content_type=_BROWSE_ROOT,
+            media_content_id=_BROWSE_SONGS,
+            can_play=False,
+            can_expand=True,
+            children=[
+                BrowseMedia(
+                    title="All songs",
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type=_BROWSE_SONGS,
+                    media_content_id=_BROWSE_SONGS,
+                    can_play=False,
+                    can_expand=True,
+                ),
+                BrowseMedia(
+                    title="Playlists",
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type=_BROWSE_PLAYLISTS,
+                    media_content_id=_BROWSE_PLAYLISTS,
+                    can_play=False,
+                    can_expand=True,
+                ),
+            ],
+            children_media_class=MediaClass.DIRECTORY,
+        )
 
-        The library is flat (no folders), so every call returns the root listing.
-        Each track's media_content_id is its integer index, which the transport
-        resolves 0-based (verified live).
-        """
+    async def _browse_songs(self) -> BrowseMedia:
         titles = await self.coordinator.transport.async_fetch_song_list()
         children = [
             BrowseMedia(
                 title=title,
-                media_class=MediaClass.MUSIC,
+                media_class=MediaClass.TRACK,
                 media_content_type=MediaType.MUSIC,
                 media_content_id=str(index),
                 can_play=True,
@@ -235,7 +266,31 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
             can_play=False,
             can_expand=True,
             children=children,
-            children_media_class=MediaClass.MUSIC,
+            children_media_class=MediaClass.TRACK,
+        )
+
+    async def _browse_playlists(self) -> BrowseMedia:
+        playlists = await self.coordinator.transport.async_fetch_playlists()
+        children = [
+            BrowseMedia(
+                title=name,
+                media_class=MediaClass.PLAYLIST,
+                media_content_type=MediaType.PLAYLIST,
+                media_content_id=f"{_PLAYLIST_ID_PREFIX}{index}",
+                can_play=True,
+                can_expand=False,
+            )
+            for index, name in enumerate(playlists)
+        ]
+        return BrowseMedia(
+            title="Playlists",
+            media_class=MediaClass.DIRECTORY,
+            media_content_type=_BROWSE_PLAYLISTS,
+            media_content_id=_BROWSE_PLAYLISTS,
+            can_play=False,
+            can_expand=True,
+            children=children,
+            children_media_class=MediaClass.PLAYLIST,
         )
 
     async def async_play_media(
@@ -247,6 +302,9 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         external/URL playback path.
         """
         await self._ensure_powered()
+        if media_type == MediaType.PLAYLIST or media_id.startswith(_PLAYLIST_ID_PREFIX):
+            await self._play_playlist_media(media_id)
+            return
         titles = await self.coordinator.transport.async_fetch_song_list()
         if media_id.isdigit():
             index: int | None = int(media_id)
@@ -261,6 +319,32 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
                 translation_placeholders={"song": media_id},
             )
         await self.coordinator.transport.async_play(index)
+        await self.coordinator.async_request_refresh()
+
+    async def _play_playlist_media(self, media_id: str) -> None:
+        playlists = await self.coordinator.transport.async_fetch_playlists()
+        raw = (
+            media_id.removeprefix(_PLAYLIST_ID_PREFIX)
+            if media_id.startswith(_PLAYLIST_ID_PREFIX)
+            else media_id
+        )
+        name: str | None = None
+        if raw.isdigit():
+            index = int(raw)
+            if 0 <= index < len(playlists):
+                name = playlists[index]
+        else:
+            for playlist in playlists:
+                if playlist.casefold() == raw.casefold().strip():
+                    name = playlist
+                    break
+        if name is None:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="playlist_not_found",
+                translation_placeholders={"playlist": media_id},
+            )
+        await self.coordinator.transport.async_select_playlist(name)
         await self.coordinator.async_request_refresh()
 
     # -- custom service ----------------------------------------------------
