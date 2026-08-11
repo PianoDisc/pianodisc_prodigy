@@ -112,9 +112,11 @@ class MqttTransport(Transport):
         self._library_waiters: dict[str, asyncio.Future[dict]] = {}
         self._playlist_waiters: dict[str, asyncio.Future[dict]] = {}
         self._song_titles: list[str] = []
+        self._song_paths: list[str] = []
         self._song_cache_at: float | None = None
         self._song_lock = asyncio.Lock()
         self._playlist_names: list[str] = []
+        self._playlist_defs: list[dict[str, object]] = []
 
     # -- lifecycle ----------------------------------------------------------
     async def async_setup(self) -> None:
@@ -601,6 +603,7 @@ class MqttTransport(Transport):
                 return list(self._song_titles)
 
             titles: list[str] = []
+            paths: list[str] = []
             seen: set[str] = set()
             self._emit_library_progress(0, True)
             try:
@@ -626,6 +629,7 @@ class MqttTransport(Transport):
                         page_paths.append(path)
                         if path not in seen:
                             seen.add(path)
+                            paths.append(path)
                             titles.append(title_from_path(path))
                             new += 1
                     self._emit_library_progress(len(titles), True)
@@ -638,23 +642,64 @@ class MqttTransport(Transport):
                 return await self._fetch_song_list_http_fallback(force=force)
 
             self._song_titles = titles
+            self._song_paths = paths
             self._song_cache_at = self._hass.loop.time()
             return list(titles)
 
+    async def async_fetch_song_paths(self, force: bool = False) -> list[str]:
+        if self._http is not None:
+            return await self._http.async_fetch_song_paths(force=force)
+        await self.async_fetch_song_list(force=force)
+        return list(self._song_paths)
+
     async def async_fetch_playlists(self) -> list[str]:
+        playlists = await self.async_fetch_playlist_definitions()
+        names = [
+            item["name"]
+            for item in playlists
+            if isinstance(item.get("name"), str)
+        ]
+        self._playlist_names = names
+        self._push(source_list=names)
+        return names
+
+    async def async_fetch_playlist_definitions(self) -> list[dict[str, object]]:
         payload = await self._request_response(
             self._playlist_request_topic,
             self._playlist_waiters,
             {"op": "get"},
         )
-        names: list[str] = []
+        playlists_out: list[dict[str, object]] = []
         playlists = payload.get("playlists") if isinstance(payload, dict) else None
         if isinstance(playlists, list):
             for item in playlists:
-                if isinstance(item, dict) and isinstance(item.get("name"), str):
-                    names.append(item["name"])
-        if not names:
-            names = await self._fetch_playlists_http_fallback()
+                if isinstance(item, dict):
+                    playlists_out.append(dict(item))
+        if not playlists_out and self._http is not None:
+            playlists_out = await self._http.async_fetch_playlist_definitions()
+        self._playlist_defs = playlists_out
+        self._playlist_names = [
+            item["name"]
+            for item in playlists_out
+            if isinstance(item.get("name"), str)
+        ]
+        return list(playlists_out)
+
+    async def async_save_playlist_definitions(
+        self, playlists: list[dict[str, object]]
+    ) -> None:
+        payload = await self._request_response(
+            self._playlist_request_topic,
+            self._playlist_waiters,
+            {"op": "set", "playlists": playlists},
+        )
+        if payload is None and self._http is not None:
+            await self._http.async_save_playlist_definitions(playlists)
+        self._playlist_defs = [dict(item) for item in playlists]
+        names = [
+            item["name"]
+            for item in playlists
+            if isinstance(item.get("name"), str)
+        ]
         self._playlist_names = names
         self._push(source_list=names)
-        return names

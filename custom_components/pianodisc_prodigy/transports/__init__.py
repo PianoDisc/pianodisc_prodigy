@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from typing import Any
 
 from ..models import ProdigyData
 
@@ -127,5 +128,19 @@ class Transport(ABC):
         """
 
     @abstractmethod
+    async def async_fetch_song_paths(self, force: bool = False) -> list[str]:
+        """Return the raw SD-card song paths (ordered; index == position)."""
+
+    @abstractmethod
     async def async_fetch_playlists(self) -> list[str]:
         """Return the playlist names."""
+
+    @abstractmethod
+    async def async_fetch_playlist_definitions(self) -> list[dict[str, Any]]:
+        """Return the raw playlist objects, preserving device/App fields."""
+
+    @abstractmethod
+    async def async_save_playlist_definitions(
+        self, playlists: list[dict[str, Any]]
+    ) -> None:
+        """Replace the device playlist set with ``playlists``."""

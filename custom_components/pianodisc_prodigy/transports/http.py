@@ -1,7 +1,7 @@
 """HTTP transport — the full control surface over the device's LAN HTTP API.
 
 This powers HTTP-only mode (poll + command + library) and is also composed by the
-MQTT transport for the request/library half MQTT lacks. Per device captures the
+MQTT transport for the request/library half MQTT lacks. Per [[golden-capture]] the
 endpoints are unauthenticated, return ``text/plain`` even for JSON (parse by path),
 and the library/status GETs are *prime-then-poll* async caches with no completion
 signal. Decoding mirrors the Calibrate app: ISO-8859-1 then strip control bytes.
@@ -76,13 +76,18 @@ class HttpTransport(Transport):
         return None
 
     # -- low-level ----------------------------------------------------------
-    async def _request(self, method: str, path: str) -> str | None:
+    async def _request(
+        self, method: str, path: str, json_body: object | None = None
+    ) -> str | None:
         """One request, socket-bounded; returns cleaned text body or None on error."""
         url = f"{self._base}/{path}"
         async with self._sem:
             try:
                 async with self._session.request(
-                    method, url, timeout=ClientTimeout(total=HTTP_REQUEST_TIMEOUT)
+                    method,
+                    url,
+                    timeout=ClientTimeout(total=HTTP_REQUEST_TIMEOUT),
+                    json=json_body,
                 ) as resp:
                     raw = await resp.read()
             except (TimeoutError, ClientError, OSError):
@@ -328,17 +333,45 @@ class HttpTransport(Transport):
             self._song_cache_at = asyncio.get_running_loop().time()
             return list(titles)
 
+    async def async_fetch_song_paths(self, force: bool = False) -> list[str]:
+        await self.async_fetch_song_list(force=force)
+        return list(self._song_paths)
+
     async def async_fetch_playlists(self) -> list[str]:
+        playlists = await self.async_fetch_playlist_definitions()
+        names = [
+            item["name"]
+            for item in playlists
+            if isinstance(item.get("name"), str)
+        ]
+        self._playlist_names = names
+        return list(names)
+
+    async def async_fetch_playlist_definitions(self) -> list[dict[str, Any]]:
         await self._request("GET", "playlist")  # prime
         await self._sleep(PRIME_POLL_WAIT)
         data = await self._get_json("playlist")
-        names: list[str] = []
+        playlists: list[dict[str, Any]] = []
         if isinstance(data, list):
             for item in data:
-                if isinstance(item, dict) and isinstance(item.get("name"), str):
-                    names.append(item["name"])
-        self._playlist_names = names
-        return list(names)
+                if isinstance(item, dict):
+                    playlists.append(dict(item))
+        self._playlist_names = [
+            item["name"]
+            for item in playlists
+            if isinstance(item.get("name"), str)
+        ]
+        return playlists
+
+    async def async_save_playlist_definitions(
+        self, playlists: list[dict[str, Any]]
+    ) -> None:
+        await self._request("POST", "playlist", json_body=playlists)
+        self._playlist_names = [
+            item["name"]
+            for item in playlists
+            if isinstance(item.get("name"), str)
+        ]
 
 
 def _as_str(value: Any) -> str | None:
