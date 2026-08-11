@@ -62,6 +62,12 @@ def _non_negative_number(value: object) -> float | None:
     return None
 
 
+def _track_index(value: object) -> int | None:
+    if isinstance(value, int) and value > 0:
+        return value - 1
+    return None
+
+
 class HttpTransport(Transport):
     """Talks to the piano over HTTP. Requires the device's LAN host/IP."""
 
@@ -158,15 +164,11 @@ class HttpTransport(Transport):
                 if isinstance(raw_song, str) and raw_song
                 else None
             )
-            song_index = player.get("index")
-            length = player.get("track_total", player.get("length"))
+            song_index = _track_index(player.get("track_index"))
+            length = player.get("track_total")
             song_count = length if isinstance(length, int) and length > 0 else None
-            media_position = _non_negative_number(
-                player.get("position", player.get("elapsed"))
-            )
-            media_duration = _positive_number(
-                player.get("duration", player.get("track_duration"))
-            )
+            media_position = _non_negative_number(player.get("position"))
+            media_duration = _positive_number(player.get("duration"))
             sort = player.get("sort")
             shuffle = (sort == 1) if sort is not None else None
 
