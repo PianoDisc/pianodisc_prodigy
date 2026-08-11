@@ -85,6 +85,9 @@
     "switch": {
       "shuffle": { "name": "Shuffle" }
     },
+    "select": {
+      "playlist": { "name": "Playlist" }
+    },
     "update": {
       "audio_firmware": { "name": "Audio firmware" },
       "midi_firmware": { "name": "MIDI firmware" }
@@ -93,6 +96,9 @@
   "exceptions": {
     "song_not_found": {
       "message": "No song matching '{song}' was found on the piano."
+    },
+    "playlist_not_found": {
+      "message": "No playlist matching '{playlist}' was found on the piano."
     },
     "power_on_timeout": {
       "message": "Powered the outlet but the piano did not come online within {seconds} seconds. Check that the linked switch actually powers this piano."
