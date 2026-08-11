@@ -64,52 +64,6 @@
           "description": "Restore the previous volume once the song has been started."
         }
       }
-    },
-    "create_playlist": {
-      "name": "Create playlist",
-      "description": "Create a playlist on the piano and write the updated playlist set back to the device.",
-      "fields": {
-        "name": { "name": "Name", "description": "Name for the new playlist." },
-        "songs": { "name": "Songs", "description": "Songs or raw /sd paths to include." },
-        "excludes": { "name": "Excludes", "description": "Songs or raw /sd paths to exclude." },
-        "sort": { "name": "Sort", "description": "Playlist sort mode." },
-        "repeat": { "name": "Repeat", "description": "Playlist repeat setting." }
-      }
-    },
-    "update_playlist": {
-      "name": "Update playlist",
-      "description": "Update playlist metadata while preserving its songs.",
-      "fields": {
-        "playlist": { "name": "Playlist", "description": "Playlist name or zero-based index." },
-        "name": { "name": "New name", "description": "New playlist name." },
-        "sort": { "name": "Sort", "description": "Playlist sort mode." },
-        "repeat": { "name": "Repeat", "description": "Playlist repeat setting." }
-      }
-    },
-    "delete_playlist": {
-      "name": "Delete playlist",
-      "description": "Delete a playlist from the piano.",
-      "fields": {
-        "playlist": { "name": "Playlist", "description": "Playlist name or zero-based index." }
-      }
-    },
-    "add_playlist_song": {
-      "name": "Add playlist song",
-      "description": "Add a song to a playlist include or exclude list.",
-      "fields": {
-        "playlist": { "name": "Playlist", "description": "Playlist name or zero-based index." },
-        "song": { "name": "Song", "description": "Song title or raw /sd path." },
-        "exclude": { "name": "Exclude", "description": "Add to the exclude list instead of the include list." }
-      }
-    },
-    "remove_playlist_song": {
-      "name": "Remove playlist song",
-      "description": "Remove a song from a playlist include or exclude list.",
-      "fields": {
-        "playlist": { "name": "Playlist", "description": "Playlist name or zero-based index." },
-        "song": { "name": "Song", "description": "Song title or raw /sd path." },
-        "exclude": { "name": "Exclude", "description": "Remove from the exclude list instead of the include list." }
-      }
     }
   },
   "entity": {
@@ -145,9 +99,6 @@
     },
     "playlist_not_found": {
       "message": "No playlist matching '{playlist}' was found on the piano."
-    },
-    "playlist_already_exists": {
-      "message": "A playlist named '{playlist}' already exists on the piano."
     },
     "power_on_timeout": {
       "message": "Powered the outlet but the piano did not come online within {seconds} seconds. Check that the linked switch actually powers this piano."
