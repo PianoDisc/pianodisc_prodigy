@@ -98,6 +98,11 @@ def _positive_number(value: object) -> float | None:
     return None
 
 
+def _track_index(value: object) -> int | None:
+    parsed = _positive_int(value)
+    return parsed - 1 if parsed is not None else None
+
+
 class MqttTransport(Transport):
     """MQTT command/status transport, optionally backed by HTTP for legacy gaps."""
 
@@ -240,27 +245,58 @@ class MqttTransport(Transport):
             else None
         )
 
-        track_total = _positive_int(payload.get("track_total", payload.get("length")))
+        track_total = _positive_int(payload.get("track_total"))
         sort = payload.get("sort")
+        duration = _positive_number(payload.get("duration"))
+        position = _non_negative_number(payload.get("position"))
+        position_updated_at = dt_util.utcnow() if position is not None else None
+        if position is None:
+            position, position_updated_at = self._local_position_for_status(
+                state, song, duration
+            )
         changes: dict[str, object] = {
             "available": self._avail(msg),
             "song": self._resolve_song(song, live_mqtt=True),
-            "song_index": _int_value(payload.get("track_index", payload.get("index"))),
+            "song_index": _track_index(payload.get("track_index")),
             "song_count": track_total,
-            "media_position": _non_negative_number(
-                payload.get("position", payload.get("elapsed"))
-            ),
-            "media_duration": _positive_number(
-                payload.get("duration", payload.get("track_duration"))
-            ),
+            "media_position": position,
+            "media_duration": duration,
             "shuffle": self._resolve_shuffle((sort == 1) if sort is not None else None),
         }
-        changes["media_position_updated_at"] = (
-            dt_util.utcnow() if changes["media_position"] is not None else None
-        )
+        changes["media_position_updated_at"] = position_updated_at
 
         self._mqtt_status_seen = True
         self._push(**changes)
+
+    def _estimated_media_position(self, now) -> float | None:
+        position = self._data.media_position
+        updated_at = self._data.media_position_updated_at
+        duration = self._data.media_duration
+        if position is None:
+            return None
+        if self._data.state is MediaPlayerState.PLAYING and updated_at is not None:
+            position += max(0.0, (now - updated_at).total_seconds())
+        if duration is not None:
+            position = min(position, duration)
+        return position
+
+    def _local_position_for_status(
+        self,
+        state: MediaPlayerState | None,
+        song: str | None,
+        duration: float | None,
+    ) -> tuple[float | None, object | None]:
+        if duration is None:
+            return None, None
+        now = dt_util.utcnow()
+        if state is MediaPlayerState.PLAYING:
+            if song is not None and song != self._data.song:
+                return 0.0, now
+            current = self._estimated_media_position(now)
+            return (0.0 if current is None else current), now
+        if state is MediaPlayerState.PAUSED:
+            return self._estimated_media_position(now), None
+        return None, None
 
     @callback
     def _on_device_name(self, msg: ReceiveMessage) -> None:
