@@ -106,6 +106,10 @@ def _track_index(value: object) -> int | None:
 class MqttTransport(Transport):
     """MQTT command/status transport, optionally backed by HTTP for legacy gaps."""
 
+    @property
+    def uses_push_updates(self) -> bool:
+        return True
+
     def __init__(
         self,
         hass: HomeAssistant,
@@ -558,12 +562,23 @@ class MqttTransport(Transport):
     async def _async_cross_check(self) -> None:
         if self._closed:
             return
-        available = False
         if self._http is not None:
-            available = await self._http.async_get_device_info() is not None
+            self._data = self._data.merge(available=False)
+            try:
+                data = await self.async_fetch_snapshot()
+            except Exception:
+                self._push(available=False)
+                self._arm_watchdog()
+                return
+            if self._closed:  # async_close can land during the HTTP await
+                return
+            self._data = data
+            self._emit(data)
+            self._arm_watchdog()
+            return
         if self._closed:  # async_close can land during the HTTP await
             return
-        self._push(available=available)
+        self._push(available=False)
         self._arm_watchdog()
 
     # -- command publishes --------------------------------------------------
@@ -679,7 +694,8 @@ class MqttTransport(Transport):
 
     # -- snapshot (HTTP fallback/backfill) + library -----------------------
     async def async_fetch_snapshot(self) -> ProdigyData:
-        if self._http is not None:
+        mqtt_is_live = self._data.available and self._mqtt_status_seen
+        if self._http is not None and not mqtt_is_live:
             playback = await self._http.async_fetch_playback(
                 fetch_volume=not self._mqtt_volume_seen
             )
@@ -689,7 +705,7 @@ class MqttTransport(Transport):
                     if self._mqtt_volume_seen or playback.volume is None
                     else playback.volume
                 )
-                if self._mqtt_status_seen:
+                if mqtt_is_live:
                     merged = self._data.merge(
                         available=True,
                         volume=volume,

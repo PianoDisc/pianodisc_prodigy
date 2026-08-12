@@ -74,7 +74,9 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
             LOGGER,
             name=f"{DOMAIN}:{entry.title}",
             config_entry=entry,
-            update_interval=DEFAULT_SCAN_INTERVAL,
+            update_interval=(
+                None if transport.uses_push_updates else DEFAULT_SCAN_INTERVAL
+            ),
         )
         self.transport = transport
         self.transport.set_push_listener(self._handle_push)
@@ -190,6 +192,10 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
     @callback
     def _retune_interval(self, data: ProdigyData) -> None:
         """Poll lightly when settled; faster while unreachable or still resolving."""
+        if self.transport.uses_push_updates:
+            if self.update_interval is not None:
+                self.update_interval = None
+            return
         if not data.available:
             interval = SCAN_INTERVAL_DISCONNECTED
         elif data.state is None:

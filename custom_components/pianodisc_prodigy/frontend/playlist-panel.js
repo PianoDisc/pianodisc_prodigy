@@ -21,12 +21,14 @@ class PianoDiscPlaylistPanel extends HTMLElement {
     this._selected = 0;
     this._query = "";
     this._dirty = false;
+    this._loading = false;
     this._saving = false;
     this._error = "";
   }
 
   async _load() {
-    if (!this._hass) return;
+    if (!this._hass || this._loading) return;
+    this._loading = true;
     this._error = "";
     this._render();
     try {
@@ -47,12 +49,14 @@ class PianoDiscPlaylistPanel extends HTMLElement {
       this._dirty = false;
     } catch (err) {
       this._error = err?.message || "Unable to load playlists";
+    } finally {
+      this._loading = false;
     }
     this._render();
   }
 
   async _save() {
-    if (!this._hass || !this._entityId || this._saving) return;
+    if (!this._hass || !this._entityId || this._saving || this._loading) return;
     this._saving = true;
     this._error = "";
     this._render();
@@ -89,11 +93,13 @@ class PianoDiscPlaylistPanel extends HTMLElement {
   }
 
   _select(index) {
+    if (this._loading || this._saving) return;
     this._selected = index;
     this._render();
   }
 
   _markDirty(render = true) {
+    if (this._loading) return;
     this._dirty = true;
     if (render) {
       this._render();
@@ -106,6 +112,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
   }
 
   _addPlaylist() {
+    if (this._loading || this._saving) return;
     this._playlists = [
       ...this._playlists,
       {
@@ -120,6 +127,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
   }
 
   _deletePlaylist(index) {
+    if (this._loading || this._saving) return;
     const playlist = this._playlists[index];
     if (!playlist) return;
     if (!confirm(`Delete playlist "${playlist.name}"?`)) return;
@@ -134,6 +142,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
   }
 
   _renamePlaylist(value) {
+    if (this._loading || this._saving) return;
     const playlist = this._playlists[this._selected];
     if (!playlist) return;
     playlist.name = value;
@@ -143,6 +152,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
   }
 
   _setSort(value) {
+    if (this._loading || this._saving) return;
     const playlist = this._playlists[this._selected];
     if (!playlist) return;
     playlist.sort = value;
@@ -150,6 +160,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
   }
 
   _setRepeat(value) {
+    if (this._loading || this._saving) return;
     const playlist = this._playlists[this._selected];
     if (!playlist) return;
     playlist.repeat = Math.max(0, Number(value) || 0);
@@ -157,6 +168,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
   }
 
   _addSong(path, listName) {
+    if (this._loading || this._saving) return;
     const playlist = this._playlists[this._selected];
     if (!playlist || !["include", "exclude"].includes(listName)) return;
     const list = playlist.content[listName];
@@ -167,6 +179,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
   }
 
   _removeSong(path, listName) {
+    if (this._loading || this._saving) return;
     const playlist = this._playlists[this._selected];
     if (!playlist || !["include", "exclude"].includes(listName)) return;
     playlist.content[listName] = playlist.content[listName].filter(
@@ -176,7 +189,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
   }
 
   _playPlaylist(index) {
-    if (!this._hass || !this._entityId) return;
+    if (!this._hass || !this._entityId || this._loading || this._saving) return;
     this._hass.callService("media_player", "play_media", {
       entity_id: this._entityId,
       media_content_type: "playlist",
@@ -219,12 +232,16 @@ class PianoDiscPlaylistPanel extends HTMLElement {
 
   _render() {
     const playlist = this._playlists[this._selected];
-    const status = this._saving
+    const busy = this._loading || this._saving;
+    const disabled = busy ? "disabled" : "";
+    const status = this._loading
+      ? "Loading..."
+      : this._saving
       ? "Saving..."
       : this._dirty
         ? "Unsaved changes"
         : "Saved";
-    const saveDisabled = !this._dirty || this._saving ? "disabled" : "";
+    const saveDisabled = !this._dirty || busy ? "disabled" : "";
     this.shadowRoot.innerHTML = `
       <style>
         :host {
@@ -308,10 +325,35 @@ class PianoDiscPlaylistPanel extends HTMLElement {
           color: var(--error-color);
           background: color-mix(in srgb, var(--error-color) 12%, transparent);
         }
+        .loading {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 12px;
+          padding: 12px;
+          border: 1px solid var(--divider-color);
+          border-radius: 6px;
+          color: var(--secondary-text-color);
+          background: var(--secondary-background-color);
+        }
+        .spinner {
+          width: 18px;
+          height: 18px;
+          border: 2px solid var(--divider-color);
+          border-top-color: var(--primary-color);
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
         .layout {
           display: grid;
           grid-template-columns: 300px minmax(0, 1fr);
           gap: 16px;
+        }
+        .layout.loading-active {
+          opacity: 0.72;
         }
         ha-card {
           display: block;
@@ -468,16 +510,21 @@ class PianoDiscPlaylistPanel extends HTMLElement {
           <div class="toolbar">
             ${this._entitySelectTemplate()}
             <span class="status">${status}</span>
-            <button data-action="refresh">Refresh</button>
+            <button data-action="refresh" ${disabled}>Refresh</button>
             <button class="primary" data-action="save" ${saveDisabled}>Save</button>
           </div>
         </header>
         ${this._error ? `<div class="error">${this._escape(this._error)}</div>` : ""}
-        <div class="layout">
+        ${
+          this._loading
+            ? `<div class="loading"><span class="spinner"></span><span>Loading playlists and SD-card songs from the piano...</span></div>`
+            : ""
+        }
+        <div class="layout ${this._loading ? "loading-active" : ""}">
           <ha-card>
             <div class="card-title">
               <span>Playlists</span>
-              <button class="icon" title="Add playlist" data-action="add-playlist">
+              <button class="icon" title="Add playlist" data-action="add-playlist" ${disabled}>
                 <ha-icon icon="mdi:plus"></ha-icon>
               </button>
             </div>
@@ -489,7 +536,9 @@ class PianoDiscPlaylistPanel extends HTMLElement {
             ${
               playlist
                 ? this._editorTemplate(playlist)
-                : `<div class="empty">Create a playlist to begin.</div>`
+                : this._loading
+                  ? `<div class="empty">Loading playlist data...</div>`
+                  : `<div class="empty">Create a playlist to begin.</div>`
             }
           </ha-card>
         </div>
@@ -501,7 +550,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
   _entitySelectTemplate() {
     if (this._entities.length <= 1) return "";
     return `
-      <select data-action="entity">
+      <select data-action="entity" ${this._loading || this._saving ? "disabled" : ""}>
         ${this._entities
           .map(
             (entity) => `
@@ -518,17 +567,21 @@ class PianoDiscPlaylistPanel extends HTMLElement {
   }
 
   _playlistListTemplate() {
+    if (this._loading && !this._playlists.length) {
+      return `<div class="empty">Loading playlists...</div>`;
+    }
     if (!this._playlists.length) {
       return `<div class="empty">No playlists yet.</div>`;
     }
+    const disabled = this._loading || this._saving ? "disabled" : "";
     return this._playlists
       .map(
         (playlist, index) => `
       <div class="playlist-row ${index === this._selected ? "active" : ""}">
-        <button data-action="select" data-index="${index}">
+        <button data-action="select" data-index="${index}" ${disabled}>
           <span class="name">${this._escape(playlist.name)}</span>
         </button>
-        <button class="icon" title="Play" data-action="play" data-index="${index}">
+        <button class="icon" title="Play" data-action="play" data-index="${index}" ${disabled}>
           <ha-icon icon="mdi:play"></ha-icon>
         </button>
       </div>
@@ -538,10 +591,11 @@ class PianoDiscPlaylistPanel extends HTMLElement {
   }
 
   _editorTemplate(playlist) {
+    const disabled = this._loading || this._saving ? "disabled" : "";
     return `
       <div class="card-title">
         <span>Edit Playlist</span>
-        <button class="icon" title="Delete playlist" data-action="delete-playlist">
+        <button class="icon" title="Delete playlist" data-action="delete-playlist" ${disabled}>
           <ha-icon icon="mdi:delete-outline"></ha-icon>
         </button>
       </div>
@@ -549,11 +603,11 @@ class PianoDiscPlaylistPanel extends HTMLElement {
         <div class="fields">
           <div class="field">
             <label>Name</label>
-            <input data-action="name" value="${this._escapeAttr(playlist.name)}">
+            <input data-action="name" value="${this._escapeAttr(playlist.name)}" ${disabled}>
           </div>
           <div class="field">
             <label>Sort</label>
-            <select data-action="sort">
+            <select data-action="sort" ${disabled}>
               <option value="Shuffle" ${
                 playlist.sort === "Shuffle" ? "selected" : ""
               }>Shuffle</option>
@@ -566,7 +620,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
             <label>Repeat</label>
             <input data-action="repeat" type="number" min="0" max="99" value="${
               playlist.repeat
-            }">
+            }" ${disabled}>
           </div>
         </div>
         <div class="rule">
@@ -601,7 +655,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
           </div>
           <input class="search" data-action="search" placeholder="Search library" value="${this._escapeAttr(
             this._query
-          )}">
+          )}" ${disabled}>
           <div class="song-list">
             ${this._availableSongsTemplate(playlist)}
           </div>
@@ -612,6 +666,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
 
   _songListTemplate(playlist, listName) {
     const paths = playlist.content[listName] || [];
+    const disabled = this._loading || this._saving ? "disabled" : "";
     if (!paths.length) {
       const text =
         listName === "include"
@@ -629,7 +684,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
         </div>
         <button class="icon" title="Remove song" data-action="remove-song" data-list="${listName}" data-path="${this._escapeAttr(
           path
-        )}">
+        )}" ${disabled}>
           <ha-icon icon="mdi:minus"></ha-icon>
         </button>
       </div>
@@ -640,6 +695,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
 
   _availableSongsTemplate(playlist) {
     const songs = this._filteredSongs();
+    const disabled = this._loading || this._saving;
     if (!songs.length) {
       return `<div class="empty">No matching songs.</div>`;
     }
@@ -660,10 +716,10 @@ class PianoDiscPlaylistPanel extends HTMLElement {
               ${isExcluded ? `<span class="badge">Excluded</span>` : ""}
               <button class="small" data-action="add-song" data-list="include" data-path="${this._escapeAttr(
                 song.path
-              )}" ${isIncluded ? "disabled" : ""}>Include</button>
+              )}" ${isIncluded || disabled ? "disabled" : ""}>Include</button>
               <button class="small" data-action="add-song" data-list="exclude" data-path="${this._escapeAttr(
                 song.path
-              )}" ${isExcluded ? "disabled" : ""}>Exclude</button>
+              )}" ${isExcluded || disabled ? "disabled" : ""}>Exclude</button>
             </div>
           </div>
         `;
