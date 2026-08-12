@@ -462,6 +462,19 @@ class MqttTransport(Transport):
         self._busy_until = self._hass.loop.time() + BUSY_DEBOUNCE
         self._suppress_current_title()
 
+    def _optimistic_resume(self) -> None:
+        """On pause -> play: resume the current title/progress, do not show Loading."""
+        self._stopped = False
+        self._paused = False
+        self._playing = True
+        self._pending_song_change = False
+        self._prev_song = None
+        self._song_grace_until = 0.0
+        changes: dict[str, object] = {}
+        if self._data.media_position is not None:
+            changes["media_position_updated_at"] = dt_util.utcnow()
+        self._push(**changes)
+
     def _resolve_shuffle(self, observed: bool | None) -> bool | None:
         """Hold a just-set shuffle target while /playerStatus.sort catches up."""
         target = self._shuffle_target
@@ -590,7 +603,10 @@ class MqttTransport(Transport):
 
     async def async_play(self, index: int | None = None) -> None:
         # Verified live (2026-06-03): {"exec":"Play","params":N} is 0-based.
-        self._optimistic_new_song()
+        if index is None and self._data.state is MediaPlayerState.PAUSED:
+            self._optimistic_resume()
+        else:
+            self._optimistic_new_song()
         command: dict = {"exec": "Play"}
         if index is not None and index >= 0:
             command["params"] = int(index)
