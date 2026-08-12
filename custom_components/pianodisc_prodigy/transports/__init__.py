@@ -41,6 +41,11 @@ class Transport(ABC):
         self._push_listener: PushListener | None = None
         self._library_progress: LibraryProgressListener | None = None
 
+    @property
+    def uses_push_updates(self) -> bool:
+        """True when the transport receives live status without coordinator polling."""
+        return False
+
     # -- lifecycle ----------------------------------------------------------
     @abstractmethod
     async def async_setup(self) -> None:

@@ -72,6 +72,11 @@ async def _async_register_playlist_editor(hass: HomeAssistant) -> None:
                 f"/{DOMAIN}/playlist-panel.js",
                 str(frontend_dir / "playlist-panel.js"),
                 cache_headers=False,
+            ),
+            StaticPathConfig(
+                f"/{DOMAIN}/default-album-art.png",
+                str(Path(__file__).with_name("brand") / "default-album-art.png"),
+                cache_headers=True,
             )
         ]
     )

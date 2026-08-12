@@ -63,6 +63,7 @@ ATTR_SONG = "song"
 _STARTING_TITLE = "Getting ready…"
 # Shown while playing but the new song's name isn't known yet (instead of the old one).
 _SONG_LOADING = "Loading…"
+_DEFAULT_ALBUM_ART = f"/{DOMAIN}/default-album-art.png"
 
 # Root node ids/types for the SD-card browse tree.
 _BROWSE_ROOT = "library"
@@ -164,6 +165,16 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
     @property
     def media_content_type(self) -> MediaType | None:
         return MediaType.MUSIC if self.media_title else None
+
+    @property
+    def media_image_url(self) -> str | None:
+        if self.media_title:
+            return _DEFAULT_ALBUM_ART
+        return None
+
+    @property
+    def media_image_remotely_accessible(self) -> bool:
+        return True
 
     @property
     def media_title(self) -> str | None:
