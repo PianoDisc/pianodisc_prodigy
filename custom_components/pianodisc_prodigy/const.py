@@ -35,7 +35,7 @@ MQTT_TOPIC_COMMAND: Final = "player"  # HA -> piano JSON command envelope
 MQTT_TOPIC_DEVICE: Final = "device"  # HA -> piano (DebugJSON etc.)
 MQTT_TOPIC_READY: Final = "ready"  # retained availability: "OK" online / "OFFLINE" via Last-Will
 # P1 firmware makes these slow-moving status topics retained and truthful.
-MQTT_TOPIC_BUSY: Final = "busy"  # "TRUE"/"FALSE" (solenoids striking)
+MQTT_TOPIC_BUSY: Final = "busy"  # "true"/"false" (solenoids striking)
 MQTT_TOPIC_VOLUME: Final = "volume"  # percent string "0".."100" (not MIDI 0..127)
 MQTT_TOPIC_PLAYER_STATUS: Final = "player/status"  # retained /playerStatus JSON
 MQTT_TOPIC_DEVICE_NAME: Final = "deviceName"
