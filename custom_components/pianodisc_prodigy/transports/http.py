@@ -82,6 +82,7 @@ class HttpTransport(Transport):
         self._song_cache_at: float | None = None
         self._song_lock = asyncio.Lock()  # serialize scans of the shared SD buffer
         self._playlist_names: list[str] = []
+        self._pre_mute_volume = 50
         # Shuffle (sort) lags in /playerStatus after we set it; hold the target until
         # the device's reading catches up (or grace lapses) so the switch sticks.
         self._shuffle_target: bool | None = None
@@ -222,7 +223,15 @@ class HttpTransport(Transport):
         await self._request("POST", "prev")
 
     async def async_set_volume(self, level_1_100: int) -> None:
+        if level_1_100 > 0:
+            self._pre_mute_volume = int(level_1_100)
         await self._request("POST", f"volume?volume={int(level_1_100)}")
+
+    async def async_mute_volume(self, mute: bool) -> None:
+        if mute:
+            await self.async_set_volume(0)
+            return
+        await self.async_set_volume(self._pre_mute_volume)
 
     async def async_set_shuffle(self, shuffle: bool) -> None:
         # /playerStatus.sort lags after this POST → hold the target in the snapshot

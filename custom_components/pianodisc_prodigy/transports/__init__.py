@@ -113,6 +113,10 @@ class Transport(ABC):
         """Set volume on the device scale (1..100)."""
 
     @abstractmethod
+    async def async_mute_volume(self, mute: bool) -> None:
+        """Mute/unmute output while preserving the user's prior non-zero volume."""
+
+    @abstractmethod
     async def async_set_shuffle(self, shuffle: bool) -> None:
         """Set the sort/shuffle mode (sequential vs shuffle)."""
 

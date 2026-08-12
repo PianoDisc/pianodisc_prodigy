@@ -151,6 +151,7 @@ class MqttTransport(Transport):
         self._song_lock = asyncio.Lock()
         self._playlist_names: list[str] = []
         self._playlist_defs: list[dict[str, object]] = []
+        self._pre_mute_volume = 50
 
     # -- lifecycle ----------------------------------------------------------
     async def async_setup(self) -> None:
@@ -660,9 +661,19 @@ class MqttTransport(Transport):
 
     async def async_set_volume(self, level_1_100: int) -> None:
         # Optimistic percent so the slider tracks instantly; the poll reads it back.
+        if level_1_100 > 0:
+            self._pre_mute_volume = int(level_1_100)
         self._mqtt_volume_seen = True
         self._push(volume=int(level_1_100))
         await self._publish({"exec": "SetVolume", "params": int(level_1_100)})
+
+    async def async_mute_volume(self, mute: bool) -> None:
+        if mute and self._data.volume is not None and self._data.volume > 0:
+            self._pre_mute_volume = self._data.volume
+        target = 0 if mute else self._pre_mute_volume
+        self._mqtt_volume_seen = True
+        self._push(volume=target)
+        await self._publish({"exec": "SetMute", "params": bool(mute)})
 
     async def async_set_shuffle(self, shuffle: bool) -> None:
         self._shuffle_target = shuffle
