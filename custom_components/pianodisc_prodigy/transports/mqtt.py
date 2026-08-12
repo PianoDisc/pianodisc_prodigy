@@ -64,7 +64,7 @@ _STATE_MAP: dict[int, MediaPlayerState] = {
 
 
 def _truthy(payload: object) -> bool:
-    """`TRUE`/`FALSE` (any case) -> bool. The device uses uppercase strings."""
+    """`true`/`false` (any case) -> bool."""
     return str(payload).strip().upper() == "TRUE"
 
 
