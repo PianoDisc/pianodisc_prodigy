@@ -688,9 +688,14 @@ class MqttTransport(Transport):
         self._push(source=name)
 
     async def async_reboot(self) -> None:
-        # Reboot is an HTTP action (/reboot.json); no MQTT equivalent in the contract.
-        if self._http is not None:
-            await self._http.async_reboot()
+        # Prefer MQTT when the device is live (or when MQTT is the only transport).
+        # Hybrid mode falls back to HTTP only after MQTT has gone stale/offline.
+        if self._data.available or self._http is None:
+            await self._publish({"exec": "Reboot"})
+            self.invalidate()
+            self._emit(self._data)
+            return
+        await self._http.async_reboot()
 
     # -- snapshot (HTTP fallback/backfill) + library -----------------------
     async def async_fetch_snapshot(self) -> ProdigyData:
