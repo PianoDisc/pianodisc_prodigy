@@ -20,7 +20,7 @@ from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 import voluptuous as vol
 
-from .const import CONF_DEVICE_ID, DOMAIN, VOLUME_MAX, VOLUME_MIN
+from .const import CONF_DEVICE_ID, DOMAIN, VOLUME_MAX
 from .coordinator import PianoDiscConfigEntry, PianoDiscCoordinator
 from .entity import PianoDiscEntity
 
@@ -29,7 +29,7 @@ from .entity import PianoDiscEntity
 PARALLEL_UPDATES = 1
 
 # Features actually backed by a device control. NB: no REPEAT_SET (no transport repeat
-# exists), no VOLUME_MUTE (SetMute is a firmware no-op). TURN_ON/TURN_OFF are added
+# exists). TURN_ON/TURN_OFF are added
 # per-entity only when the user links a power outlet (see [[power-architecture]]).
 # SELECT_SOURCE is intentionally omitted: playlists are browsed, not coerced into a
 # "source" (plan-review-v2).
@@ -46,6 +46,7 @@ _SUPPORTED = (
     | MediaPlayerEntityFeature.PREVIOUS_TRACK
     | MediaPlayerEntityFeature.VOLUME_SET
     | MediaPlayerEntityFeature.VOLUME_STEP
+    | MediaPlayerEntityFeature.VOLUME_MUTE
     | MediaPlayerEntityFeature.BROWSE_MEDIA
     | MediaPlayerEntityFeature.PLAY_MEDIA
 )
@@ -163,6 +164,11 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         return None if vol_ is None else vol_ / VOLUME_MAX
 
     @property
+    def is_volume_muted(self) -> bool | None:
+        vol_ = self.coordinator.data.volume
+        return None if vol_ is None else vol_ == 0
+
+    @property
     def media_content_type(self) -> MediaType | None:
         return MediaType.MUSIC if self.media_title else None
 
@@ -268,9 +274,12 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         await self._command(self.coordinator.transport.async_previous())
 
     async def async_set_volume_level(self, volume: float) -> None:
-        # HA 0..1 → device 1..100; 0.0 must never send an out-of-range no-op.
-        device_volume = max(VOLUME_MIN, min(VOLUME_MAX, round(volume * VOLUME_MAX)))
+        # HA 0..1 → device 0..100; 0.0 is the mute volume.
+        device_volume = max(0, min(VOLUME_MAX, round(volume * VOLUME_MAX)))
         await self._command(self.coordinator.transport.async_set_volume(device_volume))
+
+    async def async_mute_volume(self, mute: bool) -> None:
+        await self._command(self.coordinator.transport.async_mute_volume(mute))
 
     # -- browse / play media -----------------------------------------------
     async def async_browse_media(
@@ -428,7 +437,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         transport = self.coordinator.transport
         prior = self.coordinator.data.volume
         if volume is not None:
-            await transport.async_set_volume(max(VOLUME_MIN, volume))
+            await transport.async_set_volume(max(0, min(VOLUME_MAX, volume)))
 
         songs = await transport.async_fetch_song_list()
         index = _match_song(song, songs)

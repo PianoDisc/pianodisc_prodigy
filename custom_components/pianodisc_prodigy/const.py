@@ -98,8 +98,8 @@ DEBUG_KEY_AUDIO_VERSION: Final = "Audio Version"
 DEBUG_KEY_MIDI_VERSION: Final = "MIDI Version"
 
 # Volume scaling: device speaks 1..100 (SD playback / solenoid force), HA speaks 0..1.
-# NB: 0.0 must map to >= VOLUME_MIN so we never send an out-of-range no-op.
-VOLUME_MIN: Final = 1
+# 0 is the mute volume; normal non-muted playback is 1..100.
+VOLUME_MIN: Final = 0
 VOLUME_MAX: Final = 100
 
 # Polling cadence. In MQTT mode the HTTP poll is authoritative for state/volume, but the

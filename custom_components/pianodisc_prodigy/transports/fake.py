@@ -33,6 +33,7 @@ class FakeTransport(Transport):
         super().__init__()
         self.reboot_count = 0
         self.song_fetch_count = 0
+        self._pre_mute_volume = 40
         self._data = ProdigyData(
             available=True,
             state=MediaPlayerState.IDLE,
@@ -117,7 +118,18 @@ class FakeTransport(Transport):
         await self.async_play(prv)
 
     async def async_set_volume(self, level_1_100: int) -> None:
-        self._update(volume=max(1, min(100, int(level_1_100))))
+        volume = max(0, min(100, int(level_1_100)))
+        if volume > 0:
+            self._pre_mute_volume = volume
+        self._update(volume=volume)
+
+    async def async_mute_volume(self, mute: bool) -> None:
+        if mute:
+            if self._data.volume is not None and self._data.volume > 0:
+                self._pre_mute_volume = self._data.volume
+            self._update(volume=0)
+            return
+        self._update(volume=self._pre_mute_volume)
 
     async def async_set_shuffle(self, shuffle: bool) -> None:
         self._update(shuffle=bool(shuffle))
