@@ -9,10 +9,10 @@
     { "hostname": "pianodisc-*" },
     { "registered_devices": true }
   ],
-  "documentation": "https://github.com/PianoDisc/pianodisc-prodigy-ha-public",
+  "documentation": "https://github.com/PianoDisc/pianodisc_prodigy",
   "integration_type": "device",
   "iot_class": "local_push",
-  "issue_tracker": "https://github.com/PianoDisc/pianodisc-prodigy-ha-public/issues",
+  "issue_tracker": "https://github.com/PianoDisc/pianodisc_prodigy/issues",
   "mqtt": ["PianoDisc-Prodigy/+/ready"],
   "requirements": [],
   "version": "0.1.0"

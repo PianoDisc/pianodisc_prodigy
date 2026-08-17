@@ -22,15 +22,94 @@ repository.
 - A PianoDisc Prodigy II system on the same local network
 - Optional but recommended: Home Assistant's MQTT integration with a local broker
 
+## Install HACS first
+
+HACS is the Home Assistant Community Store. It lets Home Assistant install and
+update custom integrations like this one from GitHub.
+
+The steps below are a condensed HACS install guide for Home Assistant OS and Home
+Assistant Supervised. If you use Home Assistant Container or Core, follow the
+official HACS download instructions instead:
+<https://www.hacs.xyz/docs/use/download/download/>
+
+### 1. Add the HACS app repository
+
+1. In Home Assistant, go to **Settings -> Apps -> Install app**.
+2. Open the three-dot menu in the top-right corner and select **Repositories**.
+3. Add this repository URL:
+
+   ```text
+   https://github.com/hacs/addons
+   ```
+
+Official Home Assistant screenshots:
+
+![Home Assistant app store](https://www.home-assistant.io/images/getting-started/app-store.png)
+
+![Adding an app repository URL](https://www.home-assistant.io/images/getting-started/adding_repositories-url.png)
+
+### 2. Install and run Get HACS
+
+1. Stay in **Settings -> Apps -> Install app**.
+2. Search for **Get HACS**.
+3. Select **Get HACS** and install it.
+4. Start the app.
+5. Open its logs and follow the instructions shown there.
+6. When it says HACS has been downloaded, restart Home Assistant.
+
+### 3. Add the HACS integration
+
+1. After Home Assistant restarts, hard refresh your browser or clear your browser
+   cache.
+2. Go to **Settings -> Devices & services**.
+3. Click **Add integration**.
+4. Search for **HACS** and select it.
+5. Acknowledge the HACS warning statements and click **Submit**.
+
+Official HACS screenshots:
+
+![Add integration](https://www.hacs.xyz/assets/images/screenshots/core/integrations/light.png)
+
+![Select HACS](https://www.hacs.xyz/assets/images/screenshots/core/select_brand/light.png)
+
+![HACS acknowledgement screen](https://www.hacs.xyz/assets/images/screenshots/core/config_flow/init/light.png)
+
+### 4. Authorize HACS with GitHub
+
+HACS uses GitHub device authorization.
+
+1. Copy the code shown by Home Assistant.
+2. Open the GitHub device login page when Home Assistant prompts you:
+   <https://github.com/login/device>
+3. Sign in to GitHub.
+4. Paste the code.
+5. Click **Authorize HACS**.
+6. Return to Home Assistant and click **Finish**.
+
+Official HACS screenshots:
+
+![HACS device code](https://www.hacs.xyz/assets/images/screenshots/core/config_flow/waiting/light.png)
+
+![GitHub device code entry](https://www.hacs.xyz/assets/images/screenshots/github/enter_code/light.png)
+
+![Authorize HACS on GitHub](https://www.hacs.xyz/assets/images/screenshots/github/authorize/light.png)
+
+![HACS setup success](https://www.hacs.xyz/assets/images/screenshots/core/config_flow/success/light.png)
+
+You now have HACS installed and can install PianoDisc Prodigy II.
+
 ## Install with HACS
 
-1. Open **HACS** in Home Assistant.
+1. Open the **HACS** store from the Home Assistant left sidebar.
+   If you are on the HACS device page under **Settings -> Devices & services**,
+   click **Visit** to open the HACS store first. The device page itself is not
+   where custom repositories are added.
 2. Open the three-dot menu in the top-right corner.
 3. Select **Custom repositories**.
 4. Add this repository URL:
 
    ```text
-   https://github.com/PianoDisc/pianodisc-prodigy-ha-public
+   https://github.com/PianoDisc/pianodisc_prodigy.git
    ```
 
 5. Select **Integration** as the category.
