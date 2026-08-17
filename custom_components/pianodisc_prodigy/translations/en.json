@@ -28,6 +28,7 @@
     },
     "abort": {
       "already_configured": "This piano is already set up.",
+      "already_in_progress": "Setup for this piano is already in progress. Use the discovered PianoDisc Prodigy II card on the Devices & services page, or close the other setup dialog and try again.",
       "invalid_discovery_info": "Discovery message was not recognized as a Prodigy II.",
       "reconfigure_successful": "The piano's network settings were updated."
     }
