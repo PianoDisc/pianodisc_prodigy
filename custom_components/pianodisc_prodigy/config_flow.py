@@ -125,12 +125,17 @@ class PianoDiscConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_dhcp(
         self, discovery_info: DhcpServiceInfo
     ) -> ConfigFlowResult:
-        device_id = format_mac(discovery_info.macaddress).replace(":", "").upper()
+        fallback_device_id = format_mac(discovery_info.macaddress).replace(":", "").upper()
+        try:
+            device_id, default_name = await self._async_probe(discovery_info.ip)
+        except CannotConnect:
+            device_id = fallback_device_id
+            default_name = _default_name(device_id)
         await self.async_set_unique_id(device_id)
         self._abort_if_unique_id_configured(updates={CONF_HOST: discovery_info.ip})
         self._host = discovery_info.ip
         self._device_id = device_id
-        self._name = discovery_info.hostname or _default_name(device_id)
+        self._name = discovery_info.hostname or default_name
         self.context["title_placeholders"] = {"name": self._name}
         return await self.async_step_discovery_confirm()
 

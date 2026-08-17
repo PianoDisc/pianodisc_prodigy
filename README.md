@@ -128,12 +128,83 @@ search for **PianoDisc Prodigy II**.
 MQTT gives the best user experience: automatic discovery, fast state updates, and
 fewer polling delays.
 
-1. In Home Assistant, go to **Settings -> Devices & services -> Add integration**.
-2. Add **MQTT** and let Home Assistant set up or connect to your broker.
-3. In the PianoDisc Calibrate app, set the piano's MQTT broker to your Home
-   Assistant server IP address.
-4. Return to **Settings -> Devices & services**.
-5. When **PianoDisc Prodigy II discovered** appears, click **Configure**.
+#### 1. Install Mosquitto broker in Home Assistant
+
+The easiest MQTT broker for Home Assistant OS and Home Assistant Supervised is the
+official **Mosquitto broker** app.
+
+1. In Home Assistant, go to **Settings -> Apps -> Install app**.
+2. Search for **Mosquitto broker**.
+3. Select **Mosquitto broker** and click **Install**.
+4. Start the Mosquitto broker app.
+5. Open the app logs and confirm it started without errors.
+6. Go to **Settings -> Devices & services -> Add integration**.
+7. Search for **MQTT**.
+8. Select **MQTT** and follow the prompts to connect it to the Mosquitto broker.
+9. Keep MQTT discovery enabled.
+
+Home Assistant can automatically manage its own Mosquitto credentials. For the
+PianoDisc device, create a separate Mosquitto login so the device has credentials
+you can enter in its web UI.
+
+#### 2. Create a Mosquitto login for the piano
+
+1. In Home Assistant, go to **Settings -> Apps**.
+2. Open **Mosquitto broker**.
+3. Open the **Configuration** tab.
+4. Find **Logins** and add a new list item.
+5. Set:
+
+   ```text
+   username: pianodisc_mqtt
+   password: choose-a-strong-password
+   ```
+
+6. Save the Mosquitto broker configuration.
+7. Restart the Mosquitto broker app.
+8. Open the Mosquitto broker logs and confirm it started without authentication
+   errors.
+9. Keep the username and password available for the next step.
+
+If your Mosquitto broker configuration screen is in YAML mode instead of form mode,
+add the same login like this:
+
+   ```yaml
+   logins:
+     - username: pianodisc_mqtt
+       password: choose-a-strong-password
+   ```
+
+Use a dedicated username such as `pianodisc_mqtt`. Do not use `homeassistant` or
+`addons`; those names are reserved by Home Assistant's Mosquitto setup.
+
+#### 3. Point the PianoDisc device to Home Assistant
+
+1. Find the IP address of your PianoDisc Prodigy2 device.
+2. Open the Prodigy2 device web UI in a browser:
+
+   ```text
+   http://<piano-ip-address>
+   ```
+
+3. Open the **System** page.
+4. Find the IP address of your Home Assistant server.
+5. In the **MQTT Broker** section, enter:
+
+   ```text
+   MQTT broker server host name or LAN IP address: <Home Assistant IP address>
+   MQTT broker port: 1883
+   MQTT broker username: <the Mosquitto login username you created>
+   MQTT broker password: <the Mosquitto login password you created>
+   ```
+
+6. Click **Save**.
+7. Click **Apply**.
+8. Restart the PianoDisc device.
+
+After the PianoDisc device restarts and connects to Mosquitto, Home Assistant should
+discover it automatically. Go to **Settings -> Devices & services** and look for a
+new **PianoDisc Prodigy II discovered** card, then click **Configure**.
 
 If the discovered piano does not have an IP address attached, open the integration's
 **Reconfigure** option and enter the piano's IP address. This enables HTTP-based
@@ -189,12 +260,52 @@ confirm HACS installed the files under:
 /config/custom_components/pianodisc_prodigy
 ```
 
+### HACS says the repository already exists
+
+If **Custom repositories** shows:
+
+```text
+Repository 'pianodisc/pianodisc_prodigy' exists in the store.
+```
+
+the repository is already known to HACS. Close the **Custom repositories** dialog,
+return to the HACS store, search for **PianoDisc Prodigy II**, and install it from
+there. Do not delete the repository from the dialog unless you are trying to remove
+it completely.
+
+### HACS says the version cannot be used
+
+If the download dialog says something like:
+
+```text
+The version fa6e441 for this integration can not be used with HACS.
+```
+
+the repository likely needs a GitHub release. Ask the maintainer to publish a
+release whose tag matches the integration version in
+`custom_components/pianodisc_prodigy/manifest.json`, for example `v0.1.0` for
+version `0.1.0`. After the release is published, open HACS, use **Update
+information** on the repository, and try **Download** again.
+
 ### Home Assistant cannot connect to the piano
 
 - Confirm the piano is powered on.
 - Confirm the piano and Home Assistant are on the same local network.
 - Confirm the IP address is correct.
 - If using MQTT, confirm the piano is pointed at the Home Assistant MQTT broker.
+
+### Home Assistant says setup is already in progress
+
+If manual IP setup shows:
+
+```text
+already_in_progress
+```
+
+Home Assistant already has a PianoDisc setup flow open, usually because MQTT or DHCP
+discovery found the piano first. Go back to **Settings -> Devices & services** and
+use the **PianoDisc Prodigy II discovered** card instead of starting another manual
+setup. If another setup dialog is open, close it and try again.
 
 ### MQTT discovery does not appear
 
