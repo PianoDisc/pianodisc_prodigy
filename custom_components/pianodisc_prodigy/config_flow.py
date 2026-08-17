@@ -41,6 +41,7 @@ from .const import (
     DOMAIN,
     MANUFACTURER,
     MODEL,
+    MQTT_PAYLOAD_ONLINE,
     MQTT_TOPIC_ROOT,
 )
 from .transports.http import HttpTransport
@@ -113,6 +114,8 @@ class PianoDiscConfigFlow(ConfigFlow, domain=DOMAIN):
         parts = discovery_info.topic.split("/")
         if len(parts) < 3 or parts[0] != MQTT_TOPIC_ROOT:
             return self.async_abort(reason="invalid_discovery_info")
+        if str(discovery_info.payload).strip().upper() != MQTT_PAYLOAD_ONLINE:
+            return self.async_abort(reason="device_offline")
         device_id = parts[1]
         await self.async_set_unique_id(device_id)
         self._abort_if_unique_id_configured()
