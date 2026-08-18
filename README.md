@@ -202,13 +202,9 @@ Use a dedicated username such as `pianodisc_mqtt`. Do not use `homeassistant` or
 7. Click **Apply**.
 8. Restart the PianoDisc device.
 
-After the PianoDisc device restarts and connects to Mosquitto, Home Assistant should
-discover it automatically. Go to **Settings -> Devices & services** and look for a
-new **PianoDisc Prodigy II discovered** card, then click **Configure**.
+After the PianoDisc device restarts and connects to Mosquitto, Home Assistant should discover it automatically. Go to **Settings -> Devices & services** and look for a new **PianoDisc Prodigy II discovered** card, then click **Configure**.
 
-If the discovered piano does not have an IP address attached, open the integration's
-**Reconfigure** option and enter the piano's IP address. This enables HTTP-based
-features such as firmware information, library browsing, and playlist management.
+If the discovered piano does not have an IP address attached, open the integration's **Reconfigure** option and enter the piano's IP address. This enables HTTP-based features such as firmware information, library browsing, and playlist management.
 
 ### Manual IP setup
 
