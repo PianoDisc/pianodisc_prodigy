@@ -802,7 +802,7 @@ class MqttTransport(Transport):
             self._http.set_library_progress_listener(listener)
 
     async def async_fetch_song_list(self, force: bool = False) -> list[str]:
-        if not force and self._songlist_fresh():
+        if not force and not self._song_lock.locked() and self._songlist_fresh():
             return list(self._song_titles)
 
         async with self._song_lock:
@@ -825,7 +825,6 @@ class MqttTransport(Transport):
                     items = payload.get("items")
                     if not isinstance(items, list):
                         break
-                    new = 0
                     page_paths: list[str] = []
                     for item in items:
                         if not isinstance(item, str):
@@ -838,9 +837,8 @@ class MqttTransport(Transport):
                             seen.add(path)
                             paths.append(path)
                             titles.append(title_from_path(path))
-                            new += 1
                     self._emit_library_progress(len(titles), True)
-                    if new == 0 or len(page_paths) < SONGLIST_PAGE_SIZE:
+                    if len(page_paths) < SONGLIST_PAGE_SIZE:
                         break
             finally:
                 self._emit_library_progress(len(titles), False)
