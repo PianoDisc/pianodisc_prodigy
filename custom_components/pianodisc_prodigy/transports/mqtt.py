@@ -28,6 +28,7 @@ from homeassistant.util import dt as dt_util
 
 from ..const import (
     BUSY_DEBOUNCE,
+    LOGGER,
     MAX_SCAN_PAGES,
     MQTT_PAYLOAD_OFFLINE,
     MQTT_TOPIC_BUSY,
@@ -813,17 +814,26 @@ class MqttTransport(Transport):
             paths: list[str] = []
             seen: set[str] = set()
             self._emit_library_progress(0, True)
+            LOGGER.info("Starting MQTT library scan")
             try:
                 for page in range(MAX_SCAN_PAGES):
+                    LOGGER.debug("Requesting MQTT library page %s", page)
                     payload = await self._request_response(
                         self._library_request_topic,
                         self._library_waiters,
                         {"op": "scan", "page": page},
                     )
                     if not isinstance(payload, dict):
+                        LOGGER.info(
+                            "Stopping MQTT library scan at page %s: no response", page
+                        )
                         break
                     items = payload.get("items")
                     if not isinstance(items, list):
+                        LOGGER.info(
+                            "Stopping MQTT library scan at page %s: invalid items",
+                            page,
+                        )
                         break
                     page_paths: list[str] = []
                     for item in items:
@@ -838,8 +848,27 @@ class MqttTransport(Transport):
                             paths.append(path)
                             titles.append(title_from_path(path))
                     self._emit_library_progress(len(titles), True)
+                    LOGGER.info(
+                        "MQTT library page %s: raw_items=%s valid_items=%s total=%s",
+                        page,
+                        len(items),
+                        len(page_paths),
+                        len(titles),
+                    )
                     if len(page_paths) < SONGLIST_PAGE_SIZE:
+                        LOGGER.info(
+                            "Finished MQTT library scan at page %s: short page "
+                            "(%s < %s)",
+                            page,
+                            len(page_paths),
+                            SONGLIST_PAGE_SIZE,
+                        )
                         break
+            except Exception:
+                LOGGER.exception(
+                    "MQTT library scan failed after caching %s songs", len(titles)
+                )
+                raise
             finally:
                 self._emit_library_progress(len(titles), False)
 
@@ -849,6 +878,7 @@ class MqttTransport(Transport):
             self._song_titles = titles
             self._song_paths = paths
             self._song_cache_at = self._hass.loop.time()
+            LOGGER.info("MQTT library scan cached %s songs", len(titles))
             return list(titles)
 
     async def async_fetch_song_paths(self, force: bool = False) -> list[str]:
