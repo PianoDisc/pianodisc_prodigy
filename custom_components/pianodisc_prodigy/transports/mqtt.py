@@ -104,6 +104,17 @@ def _track_index(value: object) -> int | None:
     return parsed - 1 if parsed is not None else None
 
 
+def _json_payload(payload: object) -> object:
+    if isinstance(payload, (bytes, bytearray)):
+        raw = bytes(payload)
+        for encoding in ("utf-8", "cp1252", "iso-8859-1"):
+            try:
+                return json.loads(raw.decode(encoding))
+            except UnicodeDecodeError:
+                continue
+    return json.loads(payload)
+
+
 class MqttTransport(Transport):
     """MQTT command/status transport, optionally backed by HTTP for legacy gaps."""
 
@@ -167,9 +178,17 @@ class MqttTransport(Transport):
             MQTT_TOPIC_LIBRARY_PAGE: self._on_library_page,
             MQTT_TOPIC_PLAYLIST_STATE: self._on_playlist_state,
         }
+        raw_json_topics = {
+            MQTT_TOPIC_PLAYER_STATUS,
+            MQTT_TOPIC_LIBRARY_PAGE,
+            MQTT_TOPIC_PLAYLIST_STATE,
+        }
         for sub, handler in handlers.items():
             unsub = await mqtt.async_subscribe(
-                self._hass, f"{self._root}/{sub}", handler
+                self._hass,
+                f"{self._root}/{sub}",
+                handler,
+                encoding=None if sub in raw_json_topics else "utf-8",
             )
             self._unsubs.append(unsub)
         self._arm_watchdog()
@@ -226,7 +245,7 @@ class MqttTransport(Transport):
     @callback
     def _on_player_status(self, msg: ReceiveMessage) -> None:
         try:
-            payload = json.loads(msg.payload)
+            payload = _json_payload(msg.payload)
         except (ValueError, TypeError):
             return
         if not isinstance(payload, dict):
@@ -373,7 +392,7 @@ class MqttTransport(Transport):
         # over MQTT, so an MQTT-only install (no HTTP /debugJson) still populates
         # the device's sw_version. Empty strings mean "not known yet"; skip them.
         try:
-            payload = json.loads(msg.payload)
+            payload = _json_payload(msg.payload)
         except (ValueError, TypeError):
             return
         if not isinstance(payload, dict):
@@ -398,7 +417,7 @@ class MqttTransport(Transport):
         # latest firmware the device's own backend check found. Feeds the update
         # entity's latest_version. Metadata (retained), so don't touch availability.
         try:
-            payload = json.loads(msg.payload)
+            payload = _json_payload(msg.payload)
         except (ValueError, TypeError):
             return
         if not isinstance(payload, dict):
@@ -417,7 +436,7 @@ class MqttTransport(Transport):
     @callback
     def _on_library_page(self, msg: ReceiveMessage) -> None:
         try:
-            payload = json.loads(msg.payload)
+            payload = _json_payload(msg.payload)
         except (ValueError, TypeError):
             return
         if not isinstance(payload, dict):
@@ -432,7 +451,7 @@ class MqttTransport(Transport):
     @callback
     def _on_playlist_state(self, msg: ReceiveMessage) -> None:
         try:
-            payload = json.loads(msg.payload)
+            payload = _json_payload(msg.payload)
         except (ValueError, TypeError):
             return
         if not isinstance(payload, dict):
