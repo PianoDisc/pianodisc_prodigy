@@ -191,7 +191,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         # After a (re)play the stale previous title is suppressed (transport sets song
         # None) until the new one is known → show a placeholder, not the old song.
         if self.coordinator.data.state is MediaPlayerState.PAUSED:
-            return self.coordinator.data.song
+            return self.coordinator.data.song or _SONG_LOADING
         if self.coordinator.data.state is MediaPlayerState.PLAYING:
             return self.coordinator.data.song or _SONG_LOADING
         return None
