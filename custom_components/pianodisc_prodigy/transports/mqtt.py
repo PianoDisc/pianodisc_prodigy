@@ -231,13 +231,39 @@ class MqttTransport(Transport):
         if not isinstance(payload, dict):
             return
 
+        raw_song = payload.get("song")
+        song = (
+            title_from_path(raw_song)
+            if isinstance(raw_song, str) and raw_song.strip()
+            else None
+        )
+        song_index = _track_index(payload.get("track_index"))
+        track_total = _positive_int(payload.get("track_total"))
+        sort = payload.get("sort")
+        duration = _positive_number(payload.get("duration"))
+
         raw_state = _int_value(payload.get("state"))
         state = _STATE_MAP.get(raw_state) if raw_state is not None else None
+        was_playing = (
+            self._data.state is MediaPlayerState.PLAYING or self._busy_active()
+        )
+        new_song_hint = (
+            song is not None
+            and (song != self._data.song or song_index != self._data.song_index)
+        )
+        intersong_stop = (
+            state is MediaPlayerState.IDLE
+            and was_playing
+            and not self._stopped
+            and new_song_hint
+        )
         if state is not None:
             self._http_state = state
             self._paused = state is MediaPlayerState.PAUSED
             self._playing = state is MediaPlayerState.PLAYING
-            if state is not MediaPlayerState.PLAYING:
+            if intersong_stop:
+                self._hold_playing_for_song_gap()
+            elif state is not MediaPlayerState.PLAYING:
                 self._busy_until = 0.0
                 if self._cancel_busy is not None:
                     self._cancel_busy()
@@ -245,16 +271,18 @@ class MqttTransport(Transport):
             if state is MediaPlayerState.IDLE:
                 self._stopped = False
 
-        raw_song = payload.get("song")
-        song = (
-            title_from_path(raw_song)
-            if isinstance(raw_song, str) and raw_song.strip()
-            else None
-        )
+        if intersong_stop:
+            self._mqtt_status_seen = True
+            self._push(
+                available=self._avail(msg),
+                song=None,
+                media_position_updated_at=None,
+                shuffle=self._resolve_shuffle(
+                    (sort == 1) if sort is not None else None
+                ),
+            )
+            return
 
-        track_total = _positive_int(payload.get("track_total"))
-        sort = payload.get("sort")
-        duration = _positive_number(payload.get("duration"))
         display_song = self._status_song_for_display(song)
         position = _non_negative_number(payload.get("position"))
         position_updated_at = dt_util.utcnow() if position is not None else None
@@ -265,7 +293,7 @@ class MqttTransport(Transport):
         changes: dict[str, object] = {
             "available": self._avail(msg),
             "song": display_song,
-            "song_index": _track_index(payload.get("track_index")),
+            "song_index": song_index,
             "song_count": track_total,
             "media_position": position,
             "media_duration": duration,
@@ -432,7 +460,18 @@ class MqttTransport(Transport):
     def _busy_active(self) -> bool:
         return self._hass.loop.time() < self._busy_until
 
-    def _resolve_song(self, observed: str | None, *, live_mqtt: bool = False) -> str | None:
+    def _hold_playing_for_song_gap(self) -> None:
+        """Keep the media card in PLAYING while autoplay advances between songs."""
+        self._busy_until = self._hass.loop.time() + SONG_UNKNOWN_GRACE
+        if self._cancel_busy is not None:
+            self._cancel_busy()
+        self._cancel_busy = async_call_later(
+            self._hass, SONG_UNKNOWN_GRACE, self._busy_expired
+        )
+
+    def _resolve_song(
+        self, observed: str | None, *, live_mqtt: bool = False
+    ) -> str | None:
         """Suppress the pre-(re)play title until a genuinely new one appears."""
         if observed is None:
             return None
