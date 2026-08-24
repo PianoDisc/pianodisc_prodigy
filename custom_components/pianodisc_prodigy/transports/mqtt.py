@@ -279,6 +279,16 @@ class MqttTransport(Transport):
 
         raw_state = _int_value(payload.get("state"))
         state = _STATE_MAP.get(raw_state) if raw_state is not None else None
+        # The ESP retains player/status across an NRF reboot. A bare PAUSED state
+        # with no observed playback is stale cache, not a paused song.
+        if (
+            state is MediaPlayerState.PAUSED
+            and not self._playback_seen
+            and song is None
+            and song_index is None
+            and _non_negative_number(payload.get("position")) is None
+        ):
+            state = MediaPlayerState.IDLE
         stop_after_playback = state is MediaPlayerState.IDLE and self._playback_seen
         if state is not None:
             self._http_state = state

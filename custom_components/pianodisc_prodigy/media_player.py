@@ -140,7 +140,12 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         # greying out (which would hide turn-on). See [[power-architecture]].
         if coordinator.power_linked and coordinator.power_on is False:
             return True
+        # A device-reported non-ready state is authoritative. Keep the player
+        # unavailable while the NRF is still preparing MIDI and playback logic.
+        if coordinator.data.readiness not in {"unknown", "READY", "OK"}:
+            return False
         # Stay available (showing "getting ready") through the power-on/boot window.
+        # This only applies before the device has reported its own readiness state.
         if coordinator.getting_ready:
             return True
         return super().available
