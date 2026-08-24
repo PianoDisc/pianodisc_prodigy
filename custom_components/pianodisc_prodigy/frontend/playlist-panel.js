@@ -26,7 +26,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
     this._error = "";
   }
 
-  async _load() {
+  async _load(refresh = false) {
     if (!this._hass || this._loading) return;
     this._loading = true;
     this._error = "";
@@ -35,6 +35,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
       const data = await this._hass.callWS({
         type: "pianodisc_prodigy/playlist_data",
         entity_id: this._entityId || undefined,
+        refresh,
       });
       this._entities = data.entities || [];
       this._entityId = data.entity_id;
@@ -736,7 +737,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
       ?.addEventListener("click", () => this._deletePlaylist(this._selected));
     this.shadowRoot
       .querySelector("[data-action='refresh']")
-      ?.addEventListener("click", () => this._load());
+      ?.addEventListener("click", () => this._load(true));
     this.shadowRoot
       .querySelector("[data-action='save']")
       ?.addEventListener("click", () => this._save());
