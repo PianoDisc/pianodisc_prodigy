@@ -930,8 +930,9 @@ class MqttTransport(Transport):
             return list(titles)
 
     async def async_fetch_song_paths(self, force: bool = False) -> list[str]:
-        if self._http is not None:
-            return await self._http.async_fetch_song_paths(force=force)
+        # The READY prefetch fills this transport's MQTT cache. The playlist editor
+        # must consume that cache too; otherwise merely opening it re-scans through
+        # HTTP despite an already-complete MQTT library.
         await self.async_fetch_song_list(force=force)
         return list(self._song_paths)
 

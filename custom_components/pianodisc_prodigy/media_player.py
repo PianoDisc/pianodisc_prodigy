@@ -33,10 +33,6 @@ PARALLEL_UPDATES = 1
 # per-entity only when the user links a power outlet (see [[power-architecture]]).
 # SELECT_SOURCE is intentionally omitted: playlists are browsed, not coerced into a
 # "source" (plan-review-v2).
-# SHUFFLE_SET is intentionally omitted too: shuffle is a persistent device setting (the
-# firmware sort, on by default), so it lives on a dedicated switch entity that stays
-# toggleable when idle — the media card only renders its shuffle control during active
-# playback, which made toggling it off one-way. See switch.py / [[golden-capture]].
 # TURN_ON/OFF are added only when a power outlet is linked.
 _SUPPORTED = (
     MediaPlayerEntityFeature.PLAY
@@ -49,6 +45,7 @@ _SUPPORTED = (
     | MediaPlayerEntityFeature.VOLUME_MUTE
     | MediaPlayerEntityFeature.BROWSE_MEDIA
     | MediaPlayerEntityFeature.PLAY_MEDIA
+    | MediaPlayerEntityFeature.SHUFFLE_SET
 )
 
 _PLAYING_STATES = (
@@ -174,6 +171,10 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         return None if vol_ is None else vol_ == 0
 
     @property
+    def shuffle(self) -> bool | None:
+        return self.coordinator.data.shuffle
+
+    @property
     def media_content_type(self) -> MediaType | None:
         return MediaType.MUSIC if self.media_title else None
 
@@ -275,6 +276,9 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
 
     async def async_mute_volume(self, mute: bool) -> None:
         await self._command(self.coordinator.transport.async_mute_volume(mute))
+
+    async def async_set_shuffle(self, shuffle: bool) -> None:
+        await self._command(self.coordinator.transport.async_set_shuffle(shuffle))
 
     # -- browse / play media -----------------------------------------------
     async def async_browse_media(
