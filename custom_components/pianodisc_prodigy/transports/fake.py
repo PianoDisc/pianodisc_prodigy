@@ -44,7 +44,7 @@ class FakeTransport(Transport):
             song_index=None,
             song_count=len(_DEMO_SONGS),
             source=None,
-            source_list=list(_DEMO_PLAYLISTS),
+            source_list=[],
             device_name=device_name,
             firmware_audio="0.4.7",
             firmware_midi="1.3.5",
@@ -150,11 +150,13 @@ class FakeTransport(Transport):
         return list(_DEMO_SONG_PATHS)
 
     async def async_fetch_playlists(self) -> list[str]:
-        return [
+        names = [
             item["name"]
             for item in self.playlists
             if isinstance(item.get("name"), str)
         ]
+        self._update(source_list=names)
+        return names
 
     async def async_fetch_playlist_definitions(self) -> list[dict[str, object]]:
         return [dict(item) for item in self.playlists]

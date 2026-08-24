@@ -734,6 +734,14 @@ class MqttTransport(Transport):
         self._push(shuffle=shuffle)
 
     async def async_select_playlist(self, name: str) -> None:
+        # Match the rest of hybrid control: an offline MQTT transport must not
+        # prevent playlist playback when the piano's HTTP API is still reachable.
+        if not self._data.available and self._http is not None:
+            await self._http.async_fetch_playlists()
+            await self._http.async_select_playlist(name)
+            self._push(source=name)
+            return
+
         if name not in self._playlist_names:
             await self.async_fetch_playlists()
         try:
@@ -743,11 +751,14 @@ class MqttTransport(Transport):
                 {"type": "MIDIPlayer", "exec": "Playback", "params": {"playlist": name}}
             )
         else:
-            await self._request_response(
+            response = await self._request_response(
                 self._playlist_request_topic,
                 self._playlist_waiters,
                 {"op": "play", "index": index},
             )
+            if response is None and self._http is not None:
+                await self._http.async_fetch_playlists()
+                await self._http.async_select_playlist(name)
         self._push(source=name)
 
     async def async_reboot(self) -> None:
