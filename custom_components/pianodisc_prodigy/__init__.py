@@ -47,13 +47,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) ->
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Warm the song-library cache in the background so the first BROWSE_MEDIA is instant
-    # (the paged SD scan is slow); never block setup on it.
-    entry.async_create_background_task(
-        hass,
-        _async_prefetch_library(coordinator),
-        "pianodisc_prodigy_library_prefetch",
-    )
+    # Do not probe the SD card until the NRF reports that MIDI and its own initial
+    # scan are complete. A retained READY received during setup is already reflected
+    # in coordinator.data; later transitions are handled by the coordinator push path.
+    if coordinator.data.available:
+        coordinator._schedule_library_prefetch()
     return True
 
 
@@ -100,14 +98,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -
 async def _async_reload_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> None:
     """Reload the entry when its options change (e.g. the linked power outlet)."""
     await hass.config_entries.async_reload(entry.entry_id)
-
-
-async def _async_prefetch_library(coordinator: PianoDiscCoordinator) -> None:
-    """Warm the library cache (best-effort); scan-on-browse remains the fallback."""
-    try:
-        await coordinator.transport.async_fetch_song_list()
-    except Exception:
-        LOGGER.debug("Library prefetch failed; will scan on browse", exc_info=True)
 
 
 async def _async_build_transport(

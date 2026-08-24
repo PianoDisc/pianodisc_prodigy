@@ -36,6 +36,7 @@ class FakeTransport(Transport):
         self._pre_mute_volume = 40
         self._data = ProdigyData(
             available=True,
+            readiness="READY",
             state=MediaPlayerState.IDLE,
             volume=40,
             shuffle=False,
