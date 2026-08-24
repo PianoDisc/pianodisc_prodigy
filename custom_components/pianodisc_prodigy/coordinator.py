@@ -145,9 +145,15 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
     @callback
     def _handle_push(self, data: ProdigyData) -> None:
         """Apply an out-of-band update from a push transport."""
-        became_ready = data.available and (
-            self.data is None or not self.data.available
-        )
+        previous_readiness = self.data.readiness if self.data is not None else "unknown"
+        became_ready = data.readiness in {"READY", "OK"} and previous_readiness not in {
+            "READY",
+            "OK",
+        }
+        # A playback command also emits a push update. Availability is deliberately
+        # not used here: it can change for ordinary status traffic and is not a
+        # library-generation boundary.
+
         self._retune_interval(data)
         self.async_set_updated_data(data)
         if became_ready:
