@@ -21,6 +21,7 @@ class ProdigyData:
     # transport can mark the device unreachable (e.g. external power loss) without
     # inventing a playback state.
     available: bool = False
+    readiness: str = "unknown"
 
     # Playback
     state: MediaPlayerState | None = None

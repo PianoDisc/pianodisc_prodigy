@@ -217,7 +217,15 @@ class MqttTransport(Transport):
         # retained replay is last-known state, NOT proof the device is online now, so
         # it must preserve availability and leave …/ready (+ its Last-Will) and the
         # watchdog as the authority. A live (non-retained) publish still proves online.
-        return True if not msg.retain else self._data.available
+        live = True if not msg.retain else self._data.available
+        # Legacy firmware has no readiness payload; preserve its historic live-status
+        # behavior until an explicit startup state is observed.
+        return live and self._data.readiness not in {
+            "WARMING_UP",
+            "NO_SD",
+            "FAULT",
+            "OFFLINE",
+        }
 
     @callback
     def _on_busy(self, msg: ReceiveMessage) -> None:
@@ -246,6 +254,11 @@ class MqttTransport(Transport):
 
     @callback
     def _on_player_status(self, msg: ReceiveMessage) -> None:
+        if not msg.retain and self._data.readiness == "OFFLINE":
+            # A legacy device may prove it reconnected with status before it sends a
+            # readiness payload. Treat that brief compatibility window as unknown;
+            # new firmware follows with WARMING_UP or READY immediately.
+            self._data = self._data.merge(readiness="unknown")
         try:
             payload = _json_payload(msg.payload)
         except (ValueError, TypeError):
@@ -466,15 +479,17 @@ class MqttTransport(Transport):
 
     @callback
     def _on_ready(self, msg: ReceiveMessage) -> None:
-        # CR#2: …/ready now carries availability. The broker's retained Last-Will
-        # publishes OFFLINE the instant the device drops ungracefully, so honor it
-        # immediately instead of waiting out the heartbeat watchdog.
-        if str(msg.payload).strip().upper() == MQTT_PAYLOAD_OFFLINE:
-            self._push(available=False)
+        """Apply the NRF-owned playback readiness reported by the ESP gateway."""
+        readiness = str(msg.payload).strip().upper()
+        if readiness == MQTT_PAYLOAD_OFFLINE:
+            self._push(available=False, readiness="OFFLINE")
             return
-        # "OK" heartbeat → available; keep the watchdog as a backstop for the case
-        # where the broker itself becomes unreachable (no Last-Will delivered).
-        self._push(available=True)
+        # Older firmware reports OK. New firmware distinguishes a reachable gateway
+        # from a piano that has completed its MIDI and SD-card startup work.
+        self._push(
+            available=readiness in {"READY", "OK"},
+            readiness=readiness,
+        )
         self._arm_watchdog()
 
     # -- state machine ------------------------------------------------------

@@ -28,7 +28,12 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the diagnostic sensors."""
-    async_add_entities([PianoDiscLibrarySensor(entry.runtime_data)])
+    async_add_entities(
+        [
+            PianoDiscLibrarySensor(entry.runtime_data),
+            PianoDiscReadinessSensor(entry.runtime_data),
+        ]
+    )
 
 
 class PianoDiscLibrarySensor(PianoDiscEntity, SensorEntity):
@@ -63,3 +68,27 @@ class PianoDiscLibrarySensor(PianoDiscEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {"scanning": self.coordinator.library_scanning}
+
+
+class PianoDiscReadinessSensor(PianoDiscEntity, SensorEntity):
+    """Report whether the NRF has completed its safe-to-play startup work."""
+
+    _attr_name = "Readiness"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:piano"
+
+    def __init__(self, coordinator: PianoDiscCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = (
+            coordinator.config_entry.unique_id
+            or coordinator.config_entry.data[CONF_DEVICE_ID]
+        )
+        self._attr_unique_id = f"{device_id}_readiness"
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    @property
+    def native_value(self) -> str:
+        return self.coordinator.data.readiness

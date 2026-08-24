@@ -156,8 +156,12 @@ class HttpTransport(Transport):
         )  # percent (0-100); the slider source
 
         state = song = song_index = song_count = shuffle = None
+        readiness = "READY"
         media_position = media_duration = None
         if isinstance(player, dict):
+            reported_readiness = player.get("ready")
+            if isinstance(reported_readiness, str) and reported_readiness:
+                readiness = reported_readiness.upper()
             state = _STATE_MAP.get(player.get("state"))
             raw_song = player.get("song")
             song = (
@@ -176,7 +180,8 @@ class HttpTransport(Transport):
         vol = volume.get("volume") if isinstance(volume, dict) else None
 
         return ProdigyData(
-            available=isinstance(player, dict),
+            available=isinstance(player, dict) and readiness in {"READY", "OK"},
+            readiness=readiness if isinstance(player, dict) else "unknown",
             state=state,
             song=song,
             song_index=song_index,

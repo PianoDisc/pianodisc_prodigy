@@ -220,16 +220,6 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         return None
 
     @property
-    def media_artist(self) -> str | None:
-        data = self.coordinator.data
-        if data.state in _PLAYING_STATES and data.song_index is not None:
-            track = data.song_index + 1
-            if data.song_count is not None:
-                return f"Track {track} of {data.song_count}"
-            return f"Track {track}"
-        return None
-
-    @property
     def media_duration(self) -> float | None:
         data = self.coordinator.data
         if data.state in _PLAYING_STATES:

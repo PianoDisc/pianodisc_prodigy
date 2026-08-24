@@ -86,6 +86,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         self.library_count: int | None = None
         self.library_scanning: bool = False
         self._notify_library_refresh = False
+        self._library_lock = asyncio.Lock()
         # Optional linked power outlet (entity_id) and its last-known on/off state.
         self.power_switch: str | None = entry.options.get(CONF_POWER_SWITCH) or None
         self.power_on: bool | None = None
@@ -144,8 +145,13 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
     @callback
     def _handle_push(self, data: ProdigyData) -> None:
         """Apply an out-of-band update from a push transport."""
+        became_ready = data.available and (
+            self.data is None or not self.data.available
+        )
         self._retune_interval(data)
         self.async_set_updated_data(data)
+        if became_ready:
+            self._schedule_library_prefetch()
 
     # -- library scan progress ---------------------------------------------
     @property
@@ -179,7 +185,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         notification. The scan's terminal progress event clears the notification."""
         self._notify_library_refresh = True
         try:
-            await self.transport.async_fetch_song_list(force=True)
+            await self._async_scan_library(force=True)
         finally:
             # Belt-and-suspenders: if the scan raised before its terminal event, still
             # clear the notification and the flag.
@@ -188,6 +194,30 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
                 persistent_notification.async_dismiss(
                     self.hass, self._library_notification_id
                 )
+
+    @callback
+    def _schedule_library_prefetch(self) -> None:
+        """Refresh the cache after the piano transitions into playable READY."""
+        self.config_entry.async_create_background_task(
+            self.hass,
+            self.async_prefetch_library(),
+            "pianodisc_prodigy_library_prefetch",
+        )
+
+    async def async_prefetch_library(self) -> None:
+        """Populate the library automatically once playback is safe."""
+        try:
+            await self._async_scan_library(force=True)
+        except Exception:
+            LOGGER.debug("Library prefetch failed", exc_info=True)
+
+    async def _async_scan_library(self, *, force: bool) -> list[str]:
+        """Serialize automatic and manual scans against the device's shared buffer."""
+        async with self._library_lock:
+            songs = await self.transport.async_fetch_song_list(force=force)
+            self.library_count = len(songs)
+            self.async_update_listeners()
+            return songs
 
     @callback
     def _retune_interval(self, data: ProdigyData) -> None:
