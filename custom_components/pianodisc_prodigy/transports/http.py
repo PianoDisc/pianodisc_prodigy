@@ -176,6 +176,15 @@ class HttpTransport(Transport):
             media_duration = _positive_number(player.get("duration"))
             sort = player.get("sort")
             shuffle = (sort == 1) if sort is not None else None
+            # A bare PAUSED value can be the ESP's retained pre-reboot status.
+            # Without a selected track or progress it represents idle, not playback.
+            if (
+                state is MediaPlayerState.PAUSED
+                and song is None
+                and song_index is None
+                and media_position is None
+            ):
+                state = MediaPlayerState.IDLE
 
         vol = volume.get("volume") if isinstance(volume, dict) else None
 
