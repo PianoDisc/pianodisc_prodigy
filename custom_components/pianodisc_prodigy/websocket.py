@@ -28,7 +28,11 @@ def async_register_websocket_api(hass: HomeAssistant) -> None:
 
 
 @websocket_api.websocket_command(
-    {vol.Required("type"): _WS_DATA, vol.Optional("entity_id"): cv.entity_id}
+    {
+        vol.Required("type"): _WS_DATA,
+        vol.Optional("entity_id"): cv.entity_id,
+        vol.Optional("refresh", default=False): cv.boolean,
+    }
 )
 @websocket_api.async_response
 async def websocket_playlist_data(
@@ -45,6 +49,10 @@ async def websocket_playlist_data(
 
     coordinator, entity_id = selected
     transport = coordinator.transport
+    if msg["refresh"]:
+        # Use the same serialized, force-refresh path as the device-page button.
+        # The following song-path read then returns that newly populated cache.
+        await coordinator.async_refresh_library()
     playlists = await transport.async_fetch_playlist_definitions()
     paths = await transport.async_fetch_song_paths()
     songs = [{"title": title_from_path(path), "path": path} for path in paths]
