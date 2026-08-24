@@ -6,7 +6,7 @@ from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import CONF_DEVICE_ID
+from .const import CONF_DEVICE_ID, LOGGER
 from .coordinator import PianoDiscConfigEntry, PianoDiscCoordinator
 from .entity import PianoDiscEntity
 
@@ -36,6 +36,11 @@ class PianoDiscPlaylistSelect(PianoDiscEntity, SelectEntity):
         )
         self._attr_unique_id = f"{device_id}_playlist"
 
+    async def async_added_to_hass(self) -> None:
+        """Load playlist options when Home Assistant adds the entity."""
+        await super().async_added_to_hass()
+        await self._async_refresh_options()
+
     @property
     def available(self) -> bool:
         return super().available and bool(self.options)
@@ -50,5 +55,30 @@ class PianoDiscPlaylistSelect(PianoDiscEntity, SelectEntity):
         return source if source in self.options else None
 
     async def async_select_option(self, option: str) -> None:
+        options = self.options
         await self.coordinator.transport.async_select_playlist(option)
         await self.coordinator.async_request_refresh()
+        self._publish(source=option, source_list=options)
+
+    async def _async_refresh_options(self) -> None:
+        """Fetch playlist names through the same path Browse Media uses."""
+        try:
+            playlists = await self.coordinator.transport.async_fetch_playlists()
+        except Exception:
+            LOGGER.debug("Unable to load playlist select options", exc_info=True)
+            return
+        self._publish(source_list=playlists)
+
+    def _publish(
+        self, *, source: str | None = None, source_list: list[str] | None = None
+    ) -> None:
+        data = self.coordinator.data
+        if data is None:
+            return
+        changes: dict[str, object] = {}
+        if source is not None:
+            changes["source"] = source
+        if source_list is not None:
+            changes["source_list"] = list(source_list)
+        if changes:
+            self.coordinator.async_set_updated_data(data.merge(**changes))
