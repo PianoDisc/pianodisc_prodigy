@@ -33,6 +33,10 @@ class ProdigyData:
     media_position_updated_at: datetime | None = None
     volume: int | None = None  # device scale 1..100 (None = unknown)
     shuffle: bool | None = None
+    queue_mode: str | None = None
+    repeat_mode: int | None = None
+    playlist_repeat: int | None = None
+    autoplay_loop: bool | None = None
     busy: bool | None = None  # solenoids actively striking (MQTT only)
 
     # Source / library
