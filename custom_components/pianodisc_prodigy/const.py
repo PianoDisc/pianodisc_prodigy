@@ -142,8 +142,12 @@ SONG_UNKNOWN_GRACE: Final = 30.0  # seconds
 SHUFFLE_HOLD_GRACE: Final = 60.0  # seconds
 
 # Firmware version policy (decision #3). Floors/recommended.
-# TODO: confirm the exact compat range with the audio-engine team.
-FW_AUDIO_FLOOR: Final = "0.4.5"
-FW_AUDIO_RECOMMENDED: Final = "0.4.7"
-FW_MIDI_FLOOR: Final = "1.0.5"
-FW_MIDI_RECOMMENDED: Final = "1.3.5"
+# These are the first builds carrying the Home Assistant support this integration needs,
+# so the floor and the recommended version are the same: earlier releases are versions of
+# firmware that predate the feature, not older-but-workable ones. FW_*_RECOMMENDED is
+# published as the update entity's latest_version whenever the device is not reporting its
+# own backend check, so it must stay in step with the requirement stated in README.md.
+FW_AUDIO_FLOOR: Final = "0.5.0"
+FW_AUDIO_RECOMMENDED: Final = "0.5.0"
+FW_MIDI_FLOOR: Final = "1.4.0"
+FW_MIDI_RECOMMENDED: Final = "1.4.0"
