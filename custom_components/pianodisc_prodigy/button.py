@@ -64,7 +64,11 @@ class PianoDiscRefreshLibraryButton(PianoDiscEntity, ButtonEntity):
     @property
     def available(self) -> bool:
         """Avoid overlapping scans while preserving media-player availability."""
-        return super().available and not self.coordinator.library_scanning
+        return (
+            super().available
+            and not self.coordinator.library_scanning
+            and not self.coordinator.playlist_loading
+        )
 
     async def async_press(self) -> None:
         # The paged scan is slow, so re-scan off the press and let the cache update for

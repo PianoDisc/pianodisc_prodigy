@@ -395,7 +395,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         )
 
     async def _browse_playlists(self) -> BrowseMedia:
-        playlists = await self.coordinator.transport.async_fetch_playlists()
+        playlists = await self.coordinator.async_fetch_playlists()
         children = [
             BrowseMedia(
                 title=name,
@@ -450,7 +450,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         await self.coordinator.async_request_refresh()
 
     async def _play_playlist_media(self, media_id: str) -> None:
-        playlists = await self.coordinator.transport.async_fetch_playlists()
+        playlists = await self.coordinator.async_fetch_playlists()
         raw = (
             media_id.removeprefix(_PLAYLIST_ID_PREFIX)
             if media_id.startswith(_PLAYLIST_ID_PREFIX)

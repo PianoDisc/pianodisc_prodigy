@@ -167,7 +167,15 @@ class FakeTransport(Transport):
         return names
 
     async def async_fetch_playlist_definitions(self) -> list[dict[str, object]]:
-        return [dict(item) for item in self.playlists]
+        playlists = [dict(item) for item in self.playlists]
+        self._update(
+            source_list=[
+                item["name"]
+                for item in playlists
+                if isinstance(item.get("name"), str)
+            ]
+        )
+        return playlists
 
     async def async_save_playlist_definitions(
         self, playlists: list[dict[str, object]]
