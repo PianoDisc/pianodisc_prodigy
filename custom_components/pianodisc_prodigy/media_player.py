@@ -12,6 +12,7 @@ from homeassistant.components.media_player import (
     MediaPlayerEntityFeature,
     MediaPlayerState,
     MediaType,
+    RepeatMode,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
@@ -28,8 +29,8 @@ from .entity import PianoDiscEntity
 # sockets, so only one command-issuing update runs at a time per platform.
 PARALLEL_UPDATES = 1
 
-# Features actually backed by a device control. NB: no REPEAT_SET (no transport repeat
-# exists). TURN_ON/TURN_OFF are added
+# Features actually backed by a device control. REPEAT_SET is added dynamically for
+# the All Songs session; playlist and AutoPlay keep their own repeat policies.
 # per-entity only when the user links a power outlet (see [[power-architecture]]).
 # SELECT_SOURCE is intentionally omitted: playlists are browsed, not coerced into a
 # "source" (plan-review-v2).
@@ -108,6 +109,8 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
     @property
     def supported_features(self) -> MediaPlayerEntityFeature:
         features = _SUPPORTED
+        if self.coordinator.data.queue_mode == "all_songs":
+            features |= MediaPlayerEntityFeature.REPEAT_SET
         # TURN_ON/TURN_OFF only when a power outlet is linked ([[power-architecture]]).
         if self.coordinator.power_linked:
             features |= (
@@ -158,6 +161,12 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
                 attrs["track_index"] = data.song_index + 1
             if data.song_count is not None:
                 attrs["track_total"] = data.song_count
+        if data.queue_mode is not None:
+            attrs["queue_mode"] = data.queue_mode
+        if data.playlist_repeat is not None:
+            attrs["playlist_repeat"] = data.playlist_repeat
+        if data.autoplay_loop is not None:
+            attrs["autoplay_loop"] = data.autoplay_loop
         return attrs or None
 
     @property
@@ -173,6 +182,17 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
     @property
     def shuffle(self) -> bool | None:
         return self.coordinator.data.shuffle
+
+    @property
+    def repeat(self) -> RepeatMode | None:
+        """Expose standard repeat modes for an All Songs session only."""
+        if self.coordinator.data.queue_mode != "all_songs":
+            return None
+        return {
+            0: RepeatMode.OFF,
+            1: RepeatMode.ALL,
+            2: RepeatMode.ONE,
+        }.get(self.coordinator.data.repeat_mode)
 
     @property
     def media_content_type(self) -> MediaType | None:
@@ -279,6 +299,21 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
 
     async def async_set_shuffle(self, shuffle: bool) -> None:
         await self._command(self.coordinator.transport.async_set_shuffle(shuffle))
+
+    async def async_set_repeat(self, repeat: RepeatMode) -> None:
+        """Set All Songs repeat: off, all songs, or the current song."""
+        if self.coordinator.data.queue_mode != "all_songs":
+            raise ServiceValidationError(
+                "Repeat mode is controlled by the selected playlist or AutoPlay"
+            )
+        mode = {
+            RepeatMode.OFF: 0,
+            RepeatMode.ALL: 1,
+            RepeatMode.ONE: 2,
+        }.get(repeat)
+        if mode is None:
+            raise ServiceValidationError(f"Unsupported repeat mode: {repeat}")
+        await self._command(self.coordinator.transport.async_set_repeat(mode))
 
     # -- browse / play media -----------------------------------------------
     async def async_browse_media(

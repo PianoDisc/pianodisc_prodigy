@@ -276,6 +276,21 @@ class MqttTransport(Transport):
         track_total = _positive_int(payload.get("track_total"))
         sort = payload.get("sort")
         duration = _positive_number(payload.get("duration"))
+        queue_mode = payload.get("queue_mode")
+        if queue_mode not in {"all_songs", "playlist", "autoplay"}:
+            queue_mode = None
+        repeat_mode = _int_value(payload.get("repeat_mode"))
+        if repeat_mode not in {0, 1, 2}:
+            repeat_mode = None
+        playlist_repeat = _int_value(payload.get("playlist_repeat"))
+        if playlist_repeat is not None and playlist_repeat < 0:
+            playlist_repeat = None
+        autoplay_loop = payload.get("autoplay_loop")
+        if not isinstance(autoplay_loop, bool):
+            autoplay_loop = None
+        source = payload.get("playlist")
+        if queue_mode not in {"playlist", "autoplay"} or not isinstance(source, str):
+            source = None
 
         raw_state = _int_value(payload.get("state"))
         state = _STATE_MAP.get(raw_state) if raw_state is not None else None
@@ -342,6 +357,11 @@ class MqttTransport(Transport):
             "media_position": position,
             "media_duration": duration,
             "shuffle": self._resolve_shuffle((sort == 1) if sort is not None else None),
+            "queue_mode": queue_mode,
+            "repeat_mode": repeat_mode,
+            "playlist_repeat": playlist_repeat,
+            "autoplay_loop": autoplay_loop,
+            "source": source,
         }
         changes["media_position_updated_at"] = position_updated_at
 
@@ -757,6 +777,15 @@ class MqttTransport(Transport):
         self._shuffle_hold_until = self._hass.loop.time() + SHUFFLE_HOLD_GRACE
         await self._publish({"exec": "Sort", "params": 1 if shuffle else 0})
         self._push(shuffle=shuffle)
+
+    async def async_set_repeat(self, mode: int) -> None:
+        if mode not in (0, 1, 2):
+            raise ValueError(f"invalid repeat mode: {mode}")
+        if not self._data.available and self._http is not None:
+            await self._http.async_set_repeat(mode)
+        else:
+            await self._publish({"exec": "Repeat", "params": mode})
+        self._push(queue_mode="all_songs", repeat_mode=mode)
 
     async def async_select_playlist(self, name: str) -> None:
         # Match the rest of hybrid control: an offline MQTT transport must not

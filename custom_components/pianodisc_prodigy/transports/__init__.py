@@ -121,6 +121,10 @@ class Transport(ABC):
         """Set the sort/shuffle mode (sequential vs shuffle)."""
 
     @abstractmethod
+    async def async_set_repeat(self, mode: int) -> None:
+        """Set All Songs repeat: 0=off, 1=all songs, 2=current song."""
+
+    @abstractmethod
     async def async_select_playlist(self, name: str) -> None:
         """Select / play the named playlist as the active source."""
 
