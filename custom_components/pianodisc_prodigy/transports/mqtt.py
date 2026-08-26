@@ -267,6 +267,7 @@ class MqttTransport(Transport):
             return
 
         raw_song = payload.get("song")
+        song_path = raw_song.strip() if isinstance(raw_song, str) and raw_song.strip() else None
         song = (
             title_from_path(raw_song)
             if isinstance(raw_song, str) and raw_song.strip()
@@ -335,6 +336,7 @@ class MqttTransport(Transport):
             self._push(
                 available=self._avail(msg),
                 song=None,
+                song_path=None,
                 media_position_updated_at=None,
                 shuffle=self._resolve_shuffle(
                     (sort == 1) if sort is not None else None
@@ -343,6 +345,7 @@ class MqttTransport(Transport):
             return
 
         display_song = self._status_song_for_display(song)
+        display_song_path = song_path if display_song is not None else None
         position = _non_negative_number(payload.get("position"))
         position_updated_at = dt_util.utcnow() if position is not None else None
         if position is None and display_song is not None:
@@ -352,6 +355,7 @@ class MqttTransport(Transport):
         changes: dict[str, object] = {
             "available": self._avail(msg),
             "song": display_song,
+            "song_path": display_song_path,
             "song_index": song_index,
             "song_count": track_total,
             "media_position": position,
@@ -555,7 +559,12 @@ class MqttTransport(Transport):
             self._last_status_song = self._prev_song
         self._pending_song_change = True
         self._song_grace_until = self._hass.loop.time() + SONG_UNKNOWN_GRACE
-        self._push(song=None, media_position=None, media_position_updated_at=None)
+        self._push(
+            song=None,
+            song_path=None,
+            media_position=None,
+            media_position_updated_at=None,
+        )
 
     def _optimistic_new_song(self) -> None:
         """On play/next/prev: optimistically PLAYING + clear the now-stale title."""
@@ -634,6 +643,7 @@ class MqttTransport(Transport):
             available=False,
             state=None,
             song=None,
+            song_path=None,
             song_index=None,
             media_position=None,
             media_duration=None,
@@ -724,6 +734,15 @@ class MqttTransport(Transport):
         if index is not None and index >= 0:
             command["params"] = int(index)
         await self._publish(command)
+        self._push()
+
+    async def async_play_path(self, path: str) -> None:
+        """Ask the NRF to resolve a path against its current SD-card library."""
+        self._playback_seen = True
+        self._optimistic_new_song()
+        await self._publish(
+            {"type": "MIDIPlayer", "exec": "Playback", "params": {"song": path}}
+        )
         self._push()
 
     async def async_pause(self) -> None:
@@ -850,10 +869,12 @@ class MqttTransport(Transport):
                         self._stopped = (
                             False  # device confirms idle → release the stop hold
                         )
+                    song = self._resolve_song(playback.song)
                     merged = self._data.merge(
                         available=True,
                         volume=volume,
-                        song=self._resolve_song(playback.song),
+                        song=song,
+                        song_path=playback.song_path if song is not None else None,
                         song_index=playback.song_index,
                         song_count=playback.song_count,
                         media_position=playback.media_position,

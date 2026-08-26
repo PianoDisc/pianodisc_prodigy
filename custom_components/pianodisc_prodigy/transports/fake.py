@@ -99,10 +99,18 @@ class FakeTransport(Transport):
         self._update(
             state=MediaPlayerState.PLAYING,
             song=_DEMO_SONGS[index],
+            song_path=_DEMO_SONG_PATHS[index],
             song_index=index,
             media_position=0,
             media_duration=180,
         )
+
+    async def async_play_path(self, path: str) -> None:
+        try:
+            index = _DEMO_SONG_PATHS.index(path)
+        except ValueError as err:
+            raise ValueError(f"Song path is not on the SD card: {path}") from err
+        await self.async_play(index)
 
     async def async_pause(self) -> None:
         if self._data.state == MediaPlayerState.PLAYING:

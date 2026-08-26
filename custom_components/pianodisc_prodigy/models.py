@@ -26,6 +26,7 @@ class ProdigyData:
     # Playback
     state: MediaPlayerState | None = None
     song: str | None = None  # raw device title; entities blank it when idle
+    song_path: str | None = None  # canonical SD-card path reported by the device
     song_index: int | None = None  # position in the cached song list (best-effort)
     song_count: int | None = None  # total songs (best-effort)
     media_position: float | None = None  # elapsed seconds in current song
