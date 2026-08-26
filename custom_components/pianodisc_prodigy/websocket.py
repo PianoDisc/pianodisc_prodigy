@@ -48,13 +48,15 @@ async def websocket_playlist_data(
         return
 
     coordinator, entity_id = selected
-    transport = coordinator.transport
-    if msg["refresh"]:
-        # Use the same serialized, force-refresh path as the device-page button.
-        # The following song-path read then returns that newly populated cache.
-        await coordinator.async_refresh_library()
-    playlists = await transport.async_fetch_playlist_definitions()
-    paths = await transport.async_fetch_song_paths()
+    try:
+        if msg["refresh"]:
+            # Refresh both caches, then return exactly those shared cache values.
+            await coordinator.async_refresh_library()
+        playlists = await coordinator.async_fetch_playlist_definitions()
+        paths = await coordinator.transport.async_fetch_song_paths()
+    except Exception as err:
+        connection.send_error(msg["id"], "playlist_load_failed", str(err))
+        return
     songs = [{"title": title_from_path(path), "path": path} for path in paths]
     connection.send_result(
         msg["id"],
@@ -89,7 +91,11 @@ async def websocket_save_playlists(
         return
 
     playlists = [_normalize_playlist(item) for item in msg["playlists"]]
-    await coordinator.transport.async_save_playlist_definitions(playlists)
+    try:
+        await coordinator.async_save_playlist_definitions(playlists)
+    except Exception as err:
+        connection.send_error(msg["id"], "playlist_save_failed", str(err))
+        return
     await coordinator.async_request_refresh()
     connection.send_result(msg["id"], {"playlists": playlists})
 

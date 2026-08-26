@@ -984,11 +984,14 @@ class MqttTransport(Transport):
         )
         playlists_out: list[dict[str, object]] = []
         playlists = payload.get("playlists") if isinstance(payload, dict) else None
+        received_playlist_list = isinstance(playlists, list)
         if isinstance(playlists, list):
             for item in playlists:
                 if isinstance(item, dict):
                     playlists_out.append(dict(item))
-        if not playlists_out and self._http is not None:
+        # An empty list is a valid, meaningful MQTT result. Only use HTTP when
+        # MQTT did not produce a playlist list at all.
+        if not received_playlist_list and self._http is not None:
             playlists_out = await self._http.async_fetch_playlist_definitions()
         self._playlist_defs = playlists_out
         self._playlist_names = [

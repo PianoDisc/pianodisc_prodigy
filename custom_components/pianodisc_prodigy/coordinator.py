@@ -92,6 +92,10 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         self.library_ready: bool = False
         self._notify_library_refresh = False
         self._library_lock = asyncio.Lock()
+        self.playlist_definitions: list[dict[str, object]] | None = None
+        self.playlist_loading: bool = False
+        self.playlist_error: str | None = None
+        self._playlist_lock = asyncio.Lock()
         # Optional linked power outlet (entity_id) and its last-known on/off state.
         self.power_switch: str | None = entry.options.get(CONF_POWER_SWITCH) or None
         self.power_on: bool | None = None
@@ -196,6 +200,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         self._notify_library_refresh = True
         try:
             await self._async_scan_library(force=True, block_player=False)
+            await self.async_fetch_playlist_definitions(force=True)
         finally:
             # Belt-and-suspenders: if the scan raised before its terminal event, still
             # clear the notification and the flag.
@@ -224,6 +229,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         """Populate the library automatically once playback is safe."""
         try:
             await self._async_scan_library(force=True, block_player=True)
+            await self.async_fetch_playlist_definitions(force=True)
         except Exception:
             LOGGER.debug("Library prefetch failed", exc_info=True)
 
@@ -253,6 +259,59 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         async with self._library_lock:
             await command
 
+    async def async_fetch_playlist_definitions(
+        self, *, force: bool = False
+    ) -> list[dict[str, object]]:
+        """Return the shared playlist cache, loading it once when needed."""
+        async with self._playlist_lock:
+            if self.playlist_definitions is not None and not force:
+                return [dict(item) for item in self.playlist_definitions]
+            self.playlist_loading = True
+            self.playlist_error = None
+            self.async_update_listeners()
+            try:
+                playlists = await self.transport.async_fetch_playlist_definitions()
+            except Exception as err:
+                self.playlist_error = str(err) or type(err).__name__
+                raise
+            else:
+                self.playlist_definitions = [dict(item) for item in playlists]
+                self._publish_playlist_names()
+                return [dict(item) for item in self.playlist_definitions]
+            finally:
+                self.playlist_loading = False
+                self.async_update_listeners()
+
+    async def async_fetch_playlists(self, *, force: bool = False) -> list[str]:
+        """Return playlist names derived from the coordinator's definition cache."""
+        playlists = await self.async_fetch_playlist_definitions(force=force)
+        return [
+            item["name"]
+            for item in playlists
+            if isinstance(item.get("name"), str)
+        ]
+
+    async def async_save_playlist_definitions(
+        self, playlists: list[dict[str, object]]
+    ) -> None:
+        """Save definitions and atomically replace the shared cache on success."""
+        await self.transport.async_save_playlist_definitions(playlists)
+        self.playlist_definitions = [dict(item) for item in playlists]
+        self.playlist_error = None
+        self._publish_playlist_names()
+        self.async_update_listeners()
+
+    def _publish_playlist_names(self) -> None:
+        """Reflect cached playlist names in the select without a second device read."""
+        if self.data is None or self.playlist_definitions is None:
+            return
+        names = [
+            item["name"]
+            for item in self.playlist_definitions
+            if isinstance(item.get("name"), str)
+        ]
+        self.async_set_updated_data(self.data.merge(source_list=names))
+
     @property
     def library_status(self) -> str:
         """User-facing phase, separate from the NRF's hardware readiness."""
@@ -268,6 +327,19 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
     def library_initializing(self) -> bool:
         """Whether the current startup/reconnect scan must lock player controls."""
         return self.library_scanning and self._library_scan_blocks_player
+
+    @property
+    def playlist_status(self) -> str:
+        """User-facing cache/load state; empty is distinct from a failed read."""
+        if self.playlist_loading:
+            return "Loading"
+        if self.playlist_error is not None:
+            return "Failed"
+        if self.playlist_definitions is None:
+            return "Waiting for playlists"
+        if not self.playlist_definitions:
+            return "Empty"
+        return "Ready"
 
     @callback
     def _retune_interval(self, data: ProdigyData) -> None:
