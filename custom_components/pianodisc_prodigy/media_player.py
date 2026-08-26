@@ -24,6 +24,7 @@ import voluptuous as vol
 from .const import CONF_DEVICE_ID, DOMAIN, VOLUME_MAX
 from .coordinator import PianoDiscConfigEntry, PianoDiscCoordinator
 from .entity import PianoDiscEntity
+from .transports.http import title_from_path
 
 # Commands are serialized by the coordinator's transport; the device caps open
 # sockets, so only one command-issuing update runs at a time per platform.
@@ -239,11 +240,11 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
 
     @property
     def media_content_id(self) -> str | None:
-        # Integer song index is the play identifier (matches browse + PLAY_MEDIA).
-        # Blank on idle identically to media_title (plan_review_v2).
+        # A path survives library reorderings; numeric indices do not.
+        # Blank on idle identically to media_title.
         data = self.coordinator.data
-        if data.state in _PLAYING_STATES and data.song_index is not None:
-            return str(data.song_index)
+        if data.state in _PLAYING_STATES:
+            return data.song_path
         return None
 
     @property
@@ -371,17 +372,17 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         )
 
     async def _browse_songs(self) -> BrowseMedia:
-        titles = await self.coordinator.transport.async_fetch_song_list()
+        paths = await self.coordinator.transport.async_fetch_song_paths()
         children = [
             BrowseMedia(
-                title=title,
+                title=title_from_path(path),
                 media_class=MediaClass.TRACK,
                 media_content_type=MediaType.MUSIC,
-                media_content_id=str(index),
+                media_content_id=path,
                 can_play=True,
                 can_expand=False,
             )
-            for index, title in enumerate(titles)
+            for path in paths
         ]
         return BrowseMedia(
             title="Piano library",
@@ -421,7 +422,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
     async def async_play_media(
         self, media_type: str, media_id: str, **kwargs: Any
     ) -> None:
-        """Play a library song by integer index (from browse) or by name.
+        """Play a library song by its canonical SD-card path.
 
         Only the device's own SD library is playable — a player piano has no
         external/URL playback path.
@@ -431,21 +432,14 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         if media_type == MediaType.PLAYLIST or media_id.startswith(_PLAYLIST_ID_PREFIX):
             await self._play_playlist_media(media_id)
             return
-        titles = await self.coordinator.transport.async_fetch_song_list()
-        if media_id.isdigit():
-            index: int | None = int(media_id)
-            if not 0 <= index < len(titles):
-                index = None
-        else:
-            index = _match_song(media_id, titles)
-        if index is None:
+        if not media_id.startswith("/sd/"):
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="song_not_found",
                 translation_placeholders={"song": media_id},
             )
         await self.coordinator.async_execute_device_command(
-            self.coordinator.transport.async_play(index)
+            self.coordinator.transport.async_play_path(media_id)
         )
         await self.coordinator.async_request_refresh()
 
@@ -497,15 +491,19 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
                 transport.async_set_volume(max(0, min(VOLUME_MAX, volume)))
             )
 
-        songs = await transport.async_fetch_song_list()
-        index = _match_song(song, songs)
-        if index is None:
+        paths = await transport.async_fetch_song_paths()
+        if song.startswith("/sd/"):
+            path = song
+        else:
+            index = _match_song(song, [title_from_path(path) for path in paths])
+            path = paths[index] if index is not None else None
+        if path is None:
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="song_not_found",
                 translation_placeholders={"song": song},
             )
-        await self.coordinator.async_execute_device_command(transport.async_play(index))
+        await self.coordinator.async_execute_device_command(transport.async_play_path(path))
 
         if restore_volume_after and prior is not None:
             await self.coordinator.async_execute_device_command(

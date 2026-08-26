@@ -155,7 +155,7 @@ class HttpTransport(Transport):
             else None
         )  # percent (0-100); the slider source
 
-        state = song = song_index = song_count = shuffle = None
+        state = song = song_path = song_index = song_count = shuffle = None
         queue_mode = repeat_mode = playlist_repeat = autoplay_loop = source = None
         readiness = "READY"
         media_position = media_duration = None
@@ -165,6 +165,7 @@ class HttpTransport(Transport):
                 readiness = reported_readiness.upper()
             state = _STATE_MAP.get(player.get("state"))
             raw_song = player.get("song")
+            song_path = raw_song.strip() if isinstance(raw_song, str) and raw_song else None
             song = (
                 title_from_path(raw_song)
                 if isinstance(raw_song, str) and raw_song
@@ -209,6 +210,7 @@ class HttpTransport(Transport):
             readiness=readiness if isinstance(player, dict) else "unknown",
             state=state,
             song=song,
+            song_path=song_path,
             song_index=song_index,
             song_count=song_count,
             media_position=media_position,
@@ -244,6 +246,9 @@ class HttpTransport(Transport):
     # -- transport commands -------------------------------------------------
     async def async_play(self, index: int | None = None) -> None:
         await self._request("POST", f"play?index={-1 if index is None else int(index)}")
+
+    async def async_play_path(self, path: str) -> None:
+        await self._request("POST", "playback", json_body={"song": path})
 
     async def async_pause(self) -> None:
         await self._request("POST", "pause")

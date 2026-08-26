@@ -11,6 +11,7 @@ from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers import entity_registry as er
 from homeassistant.setup import async_setup_component
 
 from .const import CONF_DEVICE_ID, DOMAIN, LOGGER
@@ -29,6 +30,9 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
     Platform.UPDATE,
 ]
+# Older releases exposed shuffle as a separate switch. It is now a standard media
+# player control, but old entries need this platform explicitly unloaded on upgrade.
+_LEGACY_PLATFORMS: list[Platform] = [Platform.SWITCH]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> bool:
@@ -39,6 +43,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) ->
 
     coordinator = PianoDiscCoordinator(hass, entry, transport)
     await coordinator.async_config_entry_first_refresh()
+
+    _remove_legacy_shuffle_entity(hass, entry)
 
     entry.runtime_data = coordinator
     # An options change (linking/unlinking the power outlet) reloads the entry so the
@@ -91,7 +97,18 @@ async def _async_register_playlist_editor(hass: HomeAssistant) -> None:
 
 async def async_unload_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    return await hass.config_entries.async_unload_platforms(
+        entry, [*PLATFORMS, *_LEGACY_PLATFORMS]
+    )
+
+
+def _remove_legacy_shuffle_entity(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> None:
+    """Remove the retired standalone shuffle switch from upgraded installations."""
+    device_id = entry.unique_id or entry.data[CONF_DEVICE_ID]
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id("switch", DOMAIN, f"{device_id}_shuffle")
+    if entity_id is not None:
+        registry.async_remove(entity_id)
 
 
 async def _async_reload_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> None:
