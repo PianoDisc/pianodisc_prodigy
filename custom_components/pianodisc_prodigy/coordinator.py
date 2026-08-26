@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable
 
 from homeassistant.components import persistent_notification
 from homeassistant.components.media_player import MediaPlayerState
@@ -85,6 +86,9 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         # them). Kept off ProdigyData so a normal status push can't reset the count.
         self.library_count: int | None = None
         self.library_scanning: bool = False
+        # Becomes true only after a complete successful scan. Progress callbacks can
+        # report a partial count, so they are deliberately not used for this boundary.
+        self.library_ready: bool = False
         self._notify_library_refresh = False
         self._library_lock = asyncio.Lock()
         # Optional linked power outlet (entity_id) and its last-known on/off state.
@@ -169,7 +173,6 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         """Live library-scan progress → the Library sensor, and (only for a manual
         Refresh) a persistent notification that tracks the count and clears when done."""
         self.library_count = count
-        self.library_scanning = scanning
         self.async_update_listeners()
         if not self._notify_library_refresh:
             return
@@ -204,6 +207,12 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
     @callback
     def _schedule_library_prefetch(self) -> None:
         """Refresh the cache after the piano transitions into playable READY."""
+        if self.library_scanning:
+            return
+        # Mark synchronously so the media card cannot briefly accept commands between
+        # the READY push and the background task's first scheduling opportunity.
+        self.library_scanning = True
+        self.async_update_listeners()
         self.config_entry.async_create_background_task(
             self.hass,
             self.async_prefetch_library(),
@@ -220,10 +229,40 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
     async def _async_scan_library(self, *, force: bool) -> list[str]:
         """Serialize automatic and manual scans against the device's shared buffer."""
         async with self._library_lock:
-            songs = await self.transport.async_fetch_song_list(force=force)
-            self.library_count = len(songs)
+            self.library_scanning = True
             self.async_update_listeners()
-            return songs
+            try:
+                songs = await self.transport.async_fetch_song_list(force=force)
+                self.library_count = len(songs)
+                self.library_ready = True
+                return songs
+            finally:
+                # The transport's final progress callback can arrive before its scan
+                # coroutine has released the shared device buffer. Keep controls
+                # locked until this scope has fully returned.
+                self.library_scanning = False
+                self.async_update_listeners()
+
+    async def async_execute_device_command(self, command: Awaitable[None]) -> None:
+        """Run a player command after any active SD-library scan has finished."""
+        async with self._library_lock:
+            await command
+
+    @property
+    def library_status(self) -> str:
+        """User-facing phase, separate from the NRF's hardware readiness."""
+        if self.data.readiness not in {"READY", "OK"}:
+            return "Waiting for piano"
+        if self.library_scanning:
+            return "Scanning"
+        if self.library_count is None:
+            return "Waiting for library"
+        return "Ready"
+
+    @property
+    def library_initializing(self) -> bool:
+        """Whether HA has no complete library cache to safely present yet."""
+        return self.library_scanning and not self.library_ready
 
     @callback
     def _retune_interval(self, data: ProdigyData) -> None:

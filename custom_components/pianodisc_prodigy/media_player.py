@@ -60,6 +60,8 @@ ATTR_SONG = "song"
 
 # Shown as the now-playing text during the power-on/boot window.
 _STARTING_TITLE = "Getting ready…"
+# Shown after the NRF is ready while HA exclusively scans the shared SD library.
+_LIBRARY_SYNCING_TITLE = "Syncing library…"
 # Shown while playing but the new song's name isn't known yet (instead of the old one).
 _SONG_LOADING = "Loading…"
 _DEFAULT_ALBUM_ART = f"/{DOMAIN}/default-album-art.png"
@@ -108,8 +110,17 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
 
     @property
     def supported_features(self) -> MediaPlayerEntityFeature:
-        features = _SUPPORTED
-        if self.coordinator.data.queue_mode == "all_songs":
+        # Only the first scan has no trustworthy cache for browse/play. Subsequent
+        # refreshes retain the existing library and leave the player usable.
+        features = (
+            MediaPlayerEntityFeature(0)
+            if self.coordinator.library_initializing
+            else _SUPPORTED
+        )
+        if (
+            not self.coordinator.library_initializing
+            and self.coordinator.data.queue_mode == "all_songs"
+        ):
             features |= MediaPlayerEntityFeature.REPEAT_SET
         # TURN_ON/TURN_OFF only when a power outlet is linked ([[power-architecture]]).
         if self.coordinator.power_linked:
@@ -129,6 +140,8 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         # it's on (the switch), so present as ON with a "Getting ready…" title rather
         # than a false Idle/Playing. See [[power-architecture]].
         if coordinator.getting_ready:
+            return MediaPlayerState.ON
+        if coordinator.library_initializing:
             return MediaPlayerState.ON
         return coordinator.data.state
 
@@ -213,6 +226,8 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         # While getting ready, show a clear status line instead of a missing title.
         if self.coordinator.getting_ready:
             return _STARTING_TITLE
+        if self.coordinator.library_initializing:
+            return _LIBRARY_SYNCING_TITLE
         # The device may retain the last title on stop; only surface it while playing.
         # After a (re)play the stale previous title is suppressed (transport sets song
         # None) until the new one is known → show a placeholder, not the old song.
@@ -322,6 +337,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         media_content_id: str | None = None,
     ) -> BrowseMedia:
         """Browse the SD-card library as songs plus playable playlists."""
+        self._ensure_library_ready()
         if media_content_id == _BROWSE_SONGS:
             return await self._browse_songs()
         if media_content_id == _BROWSE_PLAYLISTS:
@@ -410,6 +426,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         Only the device's own SD library is playable — a player piano has no
         external/URL playback path.
         """
+        self._ensure_library_ready()
         await self._ensure_powered()
         if media_type == MediaType.PLAYLIST or media_id.startswith(_PLAYLIST_ID_PREFIX):
             await self._play_playlist_media(media_id)
@@ -427,7 +444,9 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
                 translation_key="song_not_found",
                 translation_placeholders={"song": media_id},
             )
-        await self.coordinator.transport.async_play(index)
+        await self.coordinator.async_execute_device_command(
+            self.coordinator.transport.async_play(index)
+        )
         await self.coordinator.async_request_refresh()
 
     async def _play_playlist_media(self, media_id: str) -> None:
@@ -453,7 +472,9 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
                 translation_key="playlist_not_found",
                 translation_placeholders={"playlist": media_id},
             )
-        await self.coordinator.transport.async_select_playlist(name)
+        await self.coordinator.async_execute_device_command(
+            self.coordinator.transport.async_select_playlist(name)
+        )
         await self.coordinator.async_request_refresh()
 
     # -- custom service ----------------------------------------------------
@@ -467,11 +488,14 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         powered on first. ``restore_volume_after`` snapshots the current volume and
         re-applies it (the device has no announce/overlay concept, so we do it here).
         """
+        self._ensure_library_ready()
         await self._ensure_powered()
         transport = self.coordinator.transport
         prior = self.coordinator.data.volume
         if volume is not None:
-            await transport.async_set_volume(max(0, min(VOLUME_MAX, volume)))
+            await self.coordinator.async_execute_device_command(
+                transport.async_set_volume(max(0, min(VOLUME_MAX, volume)))
+            )
 
         songs = await transport.async_fetch_song_list()
         index = _match_song(song, songs)
@@ -481,10 +505,12 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
                 translation_key="song_not_found",
                 translation_placeholders={"song": song},
             )
-        await transport.async_play(index)
+        await self.coordinator.async_execute_device_command(transport.async_play(index))
 
         if restore_volume_after and prior is not None:
-            await transport.async_set_volume(prior)
+            await self.coordinator.async_execute_device_command(
+                transport.async_set_volume(prior)
+            )
         await self.coordinator.async_request_refresh()
 
     # -- helpers -----------------------------------------------------------
@@ -494,8 +520,14 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
             await self.coordinator.async_power_on()
 
     async def _command(self, coro) -> None:
-        await coro
+        self._ensure_library_ready()
+        await self.coordinator.async_execute_device_command(coro)
         await self.coordinator.async_request_refresh()
+
+    def _ensure_library_ready(self) -> None:
+        """Reject commands from services/voice while the scan owns the device."""
+        if self.coordinator.library_initializing:
+            raise ServiceValidationError("Piano library is still scanning")
 
 
 def _match_song(query: str, songs: list[str]) -> int | None:

@@ -31,6 +31,7 @@ async def async_setup_entry(
     async_add_entities(
         [
             PianoDiscLibrarySensor(entry.runtime_data),
+            PianoDiscLibraryStatusSensor(entry.runtime_data),
             PianoDiscReadinessSensor(entry.runtime_data),
         ]
     )
@@ -70,6 +71,30 @@ class PianoDiscLibrarySensor(PianoDiscEntity, SensorEntity):
         return {"scanning": self.coordinator.library_scanning}
 
 
+class PianoDiscLibraryStatusSensor(PianoDiscEntity, SensorEntity):
+    """Make hardware startup and HA's library-sync phase visibly distinct."""
+
+    _attr_name = "Library status"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:database-sync"
+
+    def __init__(self, coordinator: PianoDiscCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = (
+            coordinator.config_entry.unique_id
+            or coordinator.config_entry.data[CONF_DEVICE_ID]
+        )
+        self._attr_unique_id = f"{device_id}_library_status"
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    @property
+    def native_value(self) -> str:
+        return self.coordinator.library_status
+
+
 class PianoDiscReadinessSensor(PianoDiscEntity, SensorEntity):
     """Report whether the NRF has completed its safe-to-play startup work."""
 
@@ -92,3 +117,7 @@ class PianoDiscReadinessSensor(PianoDiscEntity, SensorEntity):
     @property
     def native_value(self) -> str:
         return self.coordinator.data.readiness
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str]:
+        return {"library_status": self.coordinator.library_status}
