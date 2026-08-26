@@ -86,6 +86,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         # them). Kept off ProdigyData so a normal status push can't reset the count.
         self.library_count: int | None = None
         self.library_scanning: bool = False
+        self._library_scan_blocks_player: bool = False
         # Becomes true only after a complete successful scan. Progress callbacks can
         # report a partial count, so they are deliberately not used for this boundary.
         self.library_ready: bool = False
@@ -194,7 +195,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         notification. The scan's terminal progress event clears the notification."""
         self._notify_library_refresh = True
         try:
-            await self._async_scan_library(force=True)
+            await self._async_scan_library(force=True, block_player=False)
         finally:
             # Belt-and-suspenders: if the scan raised before its terminal event, still
             # clear the notification and the flag.
@@ -222,14 +223,17 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
     async def async_prefetch_library(self) -> None:
         """Populate the library automatically once playback is safe."""
         try:
-            await self._async_scan_library(force=True)
+            await self._async_scan_library(force=True, block_player=True)
         except Exception:
             LOGGER.debug("Library prefetch failed", exc_info=True)
 
-    async def _async_scan_library(self, *, force: bool) -> list[str]:
+    async def _async_scan_library(
+        self, *, force: bool, block_player: bool
+    ) -> list[str]:
         """Serialize automatic and manual scans against the device's shared buffer."""
         async with self._library_lock:
             self.library_scanning = True
+            self._library_scan_blocks_player = block_player
             self.async_update_listeners()
             try:
                 songs = await self.transport.async_fetch_song_list(force=force)
@@ -241,6 +245,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
                 # coroutine has released the shared device buffer. Keep controls
                 # locked until this scope has fully returned.
                 self.library_scanning = False
+                self._library_scan_blocks_player = False
                 self.async_update_listeners()
 
     async def async_execute_device_command(self, command: Awaitable[None]) -> None:
@@ -261,8 +266,8 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
 
     @property
     def library_initializing(self) -> bool:
-        """Whether HA has no complete library cache to safely present yet."""
-        return self.library_scanning and not self.library_ready
+        """Whether the current startup/reconnect scan must lock player controls."""
+        return self.library_scanning and self._library_scan_blocks_player
 
     @callback
     def _retune_interval(self, data: ProdigyData) -> None:
