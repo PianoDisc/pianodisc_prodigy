@@ -971,7 +971,13 @@ class MqttTransport(Transport):
                 self._emit_library_progress(len(titles), False)
 
             if not titles:
-                return await self._fetch_song_list_http_fallback(force=force)
+                if self._http is None:
+                    return []
+                # A hybrid fallback must warm this transport's cache too. Otherwise
+                # the READY prefetch reports a count from HTTP, but the next browse
+                # sees an empty MQTT cache and starts the full scan again.
+                titles = await self._http.async_fetch_song_list(force=force)
+                paths = await self._http.async_fetch_song_paths()
 
             self._song_titles = titles
             self._song_paths = paths

@@ -50,7 +50,14 @@ class PianoDiscPlaylistSelect(PianoDiscEntity, SelectEntity):
 
     @property
     def options(self) -> list[str]:
-        return list(self.coordinator.data.source_list)
+        # Playlist definitions are the authoritative, shared cache. ``source_list``
+        # is a playback-status convenience field and can be overwritten by a later
+        # MQTT status push before the select is rendered.
+        return [
+            item["name"]
+            for item in self.coordinator.playlist_definitions or []
+            if isinstance(item.get("name"), str)
+        ]
 
     @property
     def current_option(self) -> str | None:
