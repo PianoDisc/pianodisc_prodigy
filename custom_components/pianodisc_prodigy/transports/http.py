@@ -156,6 +156,7 @@ class HttpTransport(Transport):
         )  # percent (0-100); the slider source
 
         state = song = song_index = song_count = shuffle = None
+        queue_mode = repeat_mode = playlist_repeat = autoplay_loop = source = None
         readiness = "READY"
         media_position = media_duration = None
         if isinstance(player, dict):
@@ -176,6 +177,21 @@ class HttpTransport(Transport):
             media_duration = _positive_number(player.get("duration"))
             sort = player.get("sort")
             shuffle = (sort == 1) if sort is not None else None
+            reported_queue_mode = player.get("queue_mode")
+            if reported_queue_mode in {"all_songs", "playlist", "autoplay"}:
+                queue_mode = reported_queue_mode
+            reported_repeat = player.get("repeat_mode")
+            if isinstance(reported_repeat, int) and reported_repeat in {0, 1, 2}:
+                repeat_mode = reported_repeat
+            reported_playlist_repeat = player.get("playlist_repeat")
+            if isinstance(reported_playlist_repeat, int) and reported_playlist_repeat >= 0:
+                playlist_repeat = reported_playlist_repeat
+            if isinstance(player.get("autoplay_loop"), bool):
+                autoplay_loop = player["autoplay_loop"]
+            if queue_mode in {"playlist", "autoplay"} and isinstance(
+                player.get("playlist"), str
+            ):
+                source = player["playlist"]
             # A bare PAUSED value can be the ESP's retained pre-reboot status.
             # Without a selected track or progress it represents idle, not playback.
             if (
@@ -204,6 +220,11 @@ class HttpTransport(Transport):
             # boot until it syncs with the MIDI engine — treat out-of-range as unknown.
             volume=vol if isinstance(vol, int) and 0 <= vol <= 100 else None,
             shuffle=self._resolve_shuffle(shuffle),
+            queue_mode=queue_mode,
+            repeat_mode=repeat_mode,
+            playlist_repeat=playlist_repeat,
+            autoplay_loop=autoplay_loop,
+            source=source,
             busy=None,  # no HTTP equivalent
             # device_name left None: the per-unit name comes from the entry / MQTT.
             source_list=list(self._playlist_names),
@@ -255,6 +276,11 @@ class HttpTransport(Transport):
             asyncio.get_running_loop().time() + SHUFFLE_HOLD_GRACE
         )
         await self._request("POST", f"player?sort={1 if shuffle else 0}")
+
+    async def async_set_repeat(self, mode: int) -> None:
+        if mode not in (0, 1, 2):
+            raise ValueError(f"invalid repeat mode: {mode}")
+        await self._request("POST", f"player?repeat={mode}")
 
     def _resolve_shuffle(self, observed: bool | None) -> bool | None:
         """Hold a just-set shuffle target while /playerStatus.sort catches up."""

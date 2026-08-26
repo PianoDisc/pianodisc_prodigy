@@ -40,6 +40,8 @@ class FakeTransport(Transport):
             state=MediaPlayerState.IDLE,
             volume=40,
             shuffle=False,
+            queue_mode="all_songs",
+            repeat_mode=0,
             busy=False,
             song=None,
             song_index=None,
@@ -134,6 +136,11 @@ class FakeTransport(Transport):
 
     async def async_set_shuffle(self, shuffle: bool) -> None:
         self._update(shuffle=bool(shuffle))
+
+    async def async_set_repeat(self, mode: int) -> None:
+        if mode not in (0, 1, 2):
+            raise ValueError(f"invalid repeat mode: {mode}")
+        self._update(queue_mode="all_songs", repeat_mode=mode)
 
     async def async_select_playlist(self, name: str) -> None:
         if name in self._data.source_list:
