@@ -1,0 +1,92 @@
+name: Bug report
+description: Something in the Home Assistant integration isn't working correctly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this.
+
+        If your question is about the piano itself — its firmware, the SD card, or the
+        iQ App — [PianoDisc support](https://pianodisc.com/support/) can help faster than
+        we can here.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect to happen, and what happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How can we reproduce it?
+      description: The steps you took, in order.
+      placeholder: |
+        1. Opened the media browser
+        2. Selected a song
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: connection
+    attributes:
+      label: How is your piano connected?
+      options:
+        - IP address only (no MQTT)
+        - MQTT only (discovered, no IP address set)
+        - Both MQTT and an IP address
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: integration-version
+    attributes:
+      label: Integration version
+      description: Shown in HACS, or on the integration's page under Settings → Devices & services.
+      placeholder: "0.1.2"
+    validations:
+      required: true
+
+  - type: input
+    id: ha-version
+    attributes:
+      label: Home Assistant version
+      description: Settings → About.
+      placeholder: "2025.8.1"
+    validations:
+      required: true
+
+  - type: input
+    id: firmware
+    attributes:
+      label: Piano firmware versions
+      description: >
+        Audio and MIDI versions, shown on the piano's device page in Home Assistant and on
+        the firmware entities.
+      placeholder: "audio 0.4.7, MIDI 1.3.5"
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: >
+        Please attach the diagnostics file — it's the fastest way for us to understand what
+        happened. Get it from Settings → Devices & services → PianoDisc Prodigy II → ⋮ →
+        Download diagnostics. It does not contain your network address or piano identifier.
+      placeholder: Drag the downloaded file into this box.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: >
+        Settings → System → Logs, filtered for `pianodisc`. Paste anything that looks
+        related — it will be formatted automatically.
+      render: text

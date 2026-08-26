@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: PianoDisc product support
+    url: https://pianodisc.com/support/
+    about: Questions about the piano itself — hardware, firmware, the SD card, or the iQ App.
+  - name: Prodigy II Guide
+    url: https://pianodisc.com/support/prodigy2-guide/
+    about: Setting up and operating the Prodigy II system.
+  - name: Installing Home Assistant, HACS or MQTT
+    url: https://www.hacs.xyz/docs/use/download/download/
+    about: These are documented by their own projects. Start there.
