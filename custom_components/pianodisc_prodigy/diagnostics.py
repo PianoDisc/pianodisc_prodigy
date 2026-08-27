@@ -12,6 +12,14 @@ from .const import CONF_DEVICE_ID
 from .coordinator import PianoDiscConfigEntry
 
 TO_REDACT = {CONF_DEVICE_ID, "host", "unique_id"}
+PIANO_DEBUG_TO_REDACT = {
+    "Wi-Fi SSID",
+    "IP Address",
+    "Device ID",
+    "Serial Number",
+    "Bluetooth Name",
+    "License",
+}
 
 
 async def async_get_config_entry_diagnostics(
@@ -19,6 +27,7 @@ async def async_get_config_entry_diagnostics(
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
     coordinator = entry.runtime_data
+    piano_debug = await coordinator.transport.async_fetch_debug_json()
     return {
         "entry": {
             "title": entry.title,
@@ -32,4 +41,9 @@ async def async_get_config_entry_diagnostics(
             "on": coordinator.power_on,
         },
         "data": async_redact_data(asdict(coordinator.data), TO_REDACT),
+        "piano_debug": (
+            async_redact_data(piano_debug, PIANO_DEBUG_TO_REDACT)
+            if piano_debug is not None
+            else None
+        ),
     }

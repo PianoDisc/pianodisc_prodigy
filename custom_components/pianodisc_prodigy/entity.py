@@ -46,7 +46,13 @@ class PianoDiscEntity(CoordinatorEntity[PianoDiscCoordinator]):
             model=MODEL,
             name=coordinator.data.device_name or entry.title,
             sw_version=self._format_sw_version(),
+            configuration_url=self._configuration_url(),
         )
+
+    def _configuration_url(self) -> str | None:
+        """Offer Home Assistant's device-card link when MQTT supplied the IP."""
+        ip_address = self.coordinator.data.ip_address
+        return f"http://{ip_address}" if ip_address else None
 
     def _format_sw_version(self) -> str | None:
         data = self.coordinator.data

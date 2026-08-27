@@ -25,11 +25,13 @@ from homeassistant.core import (
 )
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
     CONF_POWER_SWITCH,
+    CONF_DEVICE_ID,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     LOGGER,
@@ -165,8 +167,20 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
 
         self._retune_interval(data)
         self.async_set_updated_data(data)
+        self._update_device_configuration_url(data.ip_address)
         if became_ready:
             self._schedule_library_prefetch()
+
+    @callback
+    def _update_device_configuration_url(self, ip_address: str | None) -> None:
+        """Keep the built-in device-card link aligned with MQTT's current IP."""
+        if ip_address is None:
+            return
+        device_id = self.config_entry.unique_id or self.config_entry.data[CONF_DEVICE_ID]
+        registry = dr.async_get(self.hass)
+        device = registry.async_get_device(identifiers={(DOMAIN, device_id)})
+        if device is not None:
+            registry.async_update_device(device.id, configuration_url=f"http://{ip_address}")
 
     # -- library scan progress ---------------------------------------------
     @property

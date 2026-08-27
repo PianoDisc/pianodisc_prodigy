@@ -140,6 +140,18 @@ class HttpTransport(Transport):
             "midi_version": _as_str(debug.get(DEBUG_KEY_MIDI_VERSION)),
         }
 
+    async def async_fetch_debug_json(self) -> dict[str, Any] | None:
+        """Refresh then retrieve the full piano diagnostic JSON on user request."""
+        # The firmware returns its existing cache from the prime request; a
+        # subsequent GET is needed after the nRF has answered over UART.
+        await self._get_json("debugJson?type=request")
+        for _ in range(4):
+            await self._sleep(PRIME_POLL_WAIT)
+            debug = await self._get_json("debugJson")
+            if isinstance(debug, dict):
+                return debug
+        return None
+
     # -- snapshot (poll path) ----------------------------------------------
     async def async_fetch_playback(self, *, fetch_volume: bool = True) -> ProdigyData:
         """Light poll of the changing bits: /playerStatus + /getVolume (2 GETs).
