@@ -92,7 +92,7 @@ async def _async_register_playlist_editor(hass: HomeAssistant) -> None:
         require_admin=False,
     )
     await async_register_panel(hass, frontend_url_path="pianodisc-autoplay", webcomponent_name="pianodisc-autoplay-panel", sidebar_title="Piano AutoPlay", sidebar_icon="mdi:play-circle-outline", module_url=f"/{DOMAIN}/autoplay-panel.js", require_admin=False)
-    await async_register_panel(hass, frontend_url_path="pianodisc-library", webcomponent_name="pianodisc-library-panel", sidebar_title="Piano Library", sidebar_icon="mdi:music-note-search", module_url=f"/{DOMAIN}/library-panel.js", require_admin=False)
+    await async_register_panel(hass, frontend_url_path="pianodisc-library", webcomponent_name="pianodisc-library-panel", sidebar_title="Piano Library", sidebar_icon="mdi:music-note", module_url=f"/{DOMAIN}/library-panel.js", require_admin=False)
     data["playlist_editor_registered"] = True
 
 

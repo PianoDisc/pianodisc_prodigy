@@ -24,6 +24,8 @@ class PianoDiscPlaylistPanel extends HTMLElement {
     this._loading = false;
     this._saving = false;
     this._error = "";
+    this._libraryStatus = "syncing";
+    this._retryTimer = null;
   }
 
   async _load(refresh = false) {
@@ -43,6 +45,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
         this._normalizePlaylist(playlist)
       );
       this._songs = data.songs || [];
+      this._libraryStatus = data.library_status || "ready";
       this._selected = Math.min(
         this._selected,
         Math.max(this._playlists.length - 1, 0)
@@ -54,6 +57,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
       this._loading = false;
     }
     this._render();
+    this._scheduleRetry();
   }
 
   async _save() {
@@ -190,7 +194,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
   }
 
   _playPlaylist(index) {
-    if (!this._hass || !this._entityId || this._loading || this._saving) return;
+    if (!this._hass || !this._entityId || this._loading || this._saving || this._libraryStatus !== "ready") return;
     this._hass.callService("media_player", "play_media", {
       entity_id: this._entityId,
       media_content_type: "playlist",
@@ -231,11 +235,26 @@ class PianoDiscPlaylistPanel extends HTMLElement {
     return `This playlist ${base}, then ${removed}.`;
   }
 
+  _scheduleRetry() {
+    clearTimeout(this._retryTimer);
+    if (this._libraryStatus !== "ready") {
+      this._retryTimer = setTimeout(() => this._load(), 1500);
+    }
+  }
+
+  disconnectedCallback() {
+    clearTimeout(this._retryTimer);
+  }
+
   _render() {
     const playlist = this._playlists[this._selected];
-    const busy = this._loading || this._saving;
+    const libraryReady = this._libraryStatus === "ready";
+    const busy = this._loading || this._saving || !libraryReady;
     const disabled = busy ? "disabled" : "";
-    const status = this._loading
+    const startupMessage = this._libraryStatus === "preparing" ? "Preparing piano..." : "Syncing library...";
+    const status = !libraryReady
+      ? startupMessage
+      : this._loading
       ? "Loading..."
       : this._saving
       ? "Saving..."
@@ -516,12 +535,8 @@ class PianoDiscPlaylistPanel extends HTMLElement {
           </div>
         </header>
         ${this._error ? `<div class="error">${this._escape(this._error)}</div>` : ""}
-        ${
-          this._loading
-            ? `<div class="loading"><span class="spinner"></span><span>Loading playlists and SD-card songs from the piano...</span></div>`
-            : ""
-        }
-        <div class="layout ${this._loading ? "loading-active" : ""}">
+        ${this._loading ? `<div class="loading"><span class="spinner"></span><span>Loading playlists and SD-card songs from the piano...</span></div>` : !libraryReady ? `<div class="loading"><span class="spinner"></span><span>${startupMessage}</span></div>` : ""}
+        ${libraryReady ? `<div class="layout ${this._loading ? "loading-active" : ""}">
           <ha-card>
             <div class="card-title">
               <span>Playlists</span>
@@ -542,7 +557,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
                   : `<div class="empty">Create a playlist to begin.</div>`
             }
           </ha-card>
-        </div>
+        </div>` : ""}
       </div>
     `;
     this._bindEvents();
