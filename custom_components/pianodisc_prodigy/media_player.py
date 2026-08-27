@@ -62,8 +62,8 @@ SERVICE_PLAY_SONG = "play_song"
 
 ATTR_SONG = "song"
 
-# Shown as the now-playing text during the power-on/boot window.
-_STARTING_TITLE = "Getting ready…"
+# Shown as the now-playing text while firmware prepares MIDI and SD playback.
+_STARTING_TITLE = "Preparing piano…"
 # Shown after the NRF is ready while HA exclusively scans the shared SD library.
 _LIBRARY_SYNCING_TITLE = "Syncing library…"
 # Shown while playing but the new song's name isn't known yet (instead of the old one).
@@ -118,11 +118,13 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         # refreshes retain the existing library and leave the player usable.
         features = (
             MediaPlayerEntityFeature(0)
-            if self.coordinator.library_initializing
+            if self.coordinator.hardware_warming
+            or self.coordinator.library_initializing
             else _SUPPORTED
         )
         if (
-            not self.coordinator.library_initializing
+            not self.coordinator.hardware_warming
+            and not self.coordinator.library_initializing
             and self.coordinator.data.queue_mode == "all_songs"
         ):
             features |= MediaPlayerEntityFeature.REPEAT_SET
@@ -140,6 +142,10 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         # A linked outlet that is off means the piano is powered down → OFF.
         if coordinator.power_linked and coordinator.power_on is False:
             return MediaPlayerState.OFF
+        # Firmware has made the device's power-on work visible. ``on`` accurately
+        # communicates that the piano is preparing, without pretending it can play.
+        if coordinator.hardware_warming:
+            return MediaPlayerState.ON
         # Linked + powered on but not reporting yet → "getting ready" (booting). We know
         # it's on (the switch), so present as ON with a "Getting ready…" title rather
         # than a false Idle/Playing. See [[power-architecture]].
@@ -156,6 +162,10 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         # powered off so the card shows OFF with a working power button rather than
         # greying out (which would hide turn-on). See [[power-architecture]].
         if coordinator.power_linked and coordinator.power_on is False:
+            return True
+        # Show a live preparation state rather than a grey, unexplained failure.
+        # supported_features is reduced to power-only until firmware says READY.
+        if coordinator.hardware_warming:
             return True
         # A device-reported non-ready state is authoritative. Keep the player
         # unavailable while the NRF is still preparing MIDI and playback logic.
@@ -228,7 +238,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
     @property
     def media_title(self) -> str | None:
         # While getting ready, show a clear status line instead of a missing title.
-        if self.coordinator.getting_ready:
+        if self.coordinator.hardware_warming or self.coordinator.getting_ready:
             return _STARTING_TITLE
         if self.coordinator.library_initializing:
             return _LIBRARY_SYNCING_TITLE

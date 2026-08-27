@@ -123,6 +123,11 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
             return False
         return self.data is None or self.data.state is None
 
+    @property
+    def hardware_warming(self) -> bool:
+        """Whether firmware explicitly reports that playback is still preparing."""
+        return self.data is not None and self.data.readiness == "WARMING_UP"
+
     async def _async_setup(self) -> None:
         """Bring the transport up and start tracking the power outlet (if linked)."""
         await self.transport.async_setup()
