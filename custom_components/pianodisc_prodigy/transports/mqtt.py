@@ -134,12 +134,12 @@ class MqttTransport(Transport):
         super().__init__()
         self._hass = hass
         self._http = http
-        self._http_host: str | None = None
+        self._http_host = http.ip_address if isinstance(http, HttpTransport) else None
         self._root = f"{MQTT_TOPIC_ROOT}/{device_id}"
         self._command_topic = f"{self._root}/{MQTT_TOPIC_COMMAND}"
         self._library_request_topic = f"{self._root}/{MQTT_TOPIC_LIBRARY_REQUEST}"
         self._playlist_request_topic = f"{self._root}/{MQTT_TOPIC_PLAYLIST_REQUEST}"
-        self._data = ProdigyData()
+        self._data = ProdigyData(ip_address=self._http_host)
         # State inputs. The displayed state is derived from these (see _derive_state).
         self._http_state: MediaPlayerState | None = None  # last /playerStatus state
         self._busy_until = 0.0  # busy counts as "playing" until this loop time
