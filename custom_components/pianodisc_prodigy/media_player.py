@@ -13,6 +13,8 @@ from homeassistant.components.media_player import (
     MediaPlayerState,
     MediaType,
     RepeatMode,
+    SearchMedia,
+    SearchMediaQuery,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
@@ -46,6 +48,7 @@ _SUPPORTED = (
     | MediaPlayerEntityFeature.VOLUME_STEP
     | MediaPlayerEntityFeature.VOLUME_MUTE
     | MediaPlayerEntityFeature.BROWSE_MEDIA
+    | MediaPlayerEntityFeature.SEARCH_MEDIA
     | MediaPlayerEntityFeature.PLAY_MEDIA
     | MediaPlayerEntityFeature.SHUFFLE_SET
 )
@@ -358,6 +361,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
                     media_content_id=_BROWSE_SONGS,
                     can_play=False,
                     can_expand=True,
+                    can_search=True,
                 ),
                 BrowseMedia(
                     title="Playlists",
@@ -369,6 +373,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
                 ),
             ],
             children_media_class=MediaClass.DIRECTORY,
+            can_search=True,
         )
 
     async def _browse_songs(self) -> BrowseMedia:
@@ -393,6 +398,42 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
             can_expand=True,
             children=children,
             children_media_class=MediaClass.TRACK,
+            can_search=True,
+        )
+
+    async def async_search_media(self, query: SearchMediaQuery) -> SearchMedia:
+        """Search cached SD-card song titles without scanning the device again."""
+        self._ensure_library_ready()
+        if query.media_content_id not in (None, _BROWSE_ROOT, _BROWSE_SONGS):
+            return SearchMedia(result=[])
+        if query.media_content_type not in (
+            None,
+            _BROWSE_ROOT,
+            _BROWSE_SONGS,
+            MediaType.MUSIC,
+        ):
+            return SearchMedia(result=[])
+        if query.media_filter_classes and MediaClass.TRACK not in query.media_filter_classes:
+            return SearchMedia(result=[])
+
+        text = query.search_query.casefold().strip()
+        if not text:
+            return SearchMedia(result=[])
+
+        paths = await self.coordinator.transport.async_fetch_song_paths()
+        return SearchMedia(
+            result=[
+                BrowseMedia(
+                    title=title_from_path(path),
+                    media_class=MediaClass.TRACK,
+                    media_content_type=MediaType.MUSIC,
+                    media_content_id=path,
+                    can_play=True,
+                    can_expand=False,
+                )
+                for path in paths
+                if text in title_from_path(path).casefold()
+            ]
         )
 
     async def _browse_playlists(self) -> BrowseMedia:
