@@ -85,7 +85,7 @@
       "refresh_library": { "name": "Refresh library" }
     },
     "switch": {
-      "shuffle": { "name": "Shuffle" }
+      "power": { "name": "Power" }
     },
     "select": {
       "playlist": { "name": "Playlist" }
@@ -101,15 +101,6 @@
     },
     "playlist_not_found": {
       "message": "No playlist matching '{playlist}' was found on the piano."
-    },
-    "power_on_timeout": {
-      "message": "Powered the outlet but the piano did not come online within {seconds} seconds. Check that the linked switch actually powers this piano."
-    }
-  },
-  "issues": {
-    "power_on_timeout": {
-      "title": "Piano did not power on",
-      "description": "Home Assistant switched on the linked outlet ({switch}) but {name} never came online. Check that the linked switch powers this piano and that the piano is connected to the network."
     }
   }
 }

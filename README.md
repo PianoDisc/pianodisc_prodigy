@@ -110,6 +110,7 @@ One **PianoDisc Prodigy II** device with these controls:
 | **Readiness** | Whether the piano has finished starting up and is safe to play |
 | **Refresh library** | Re-scan the SD card after you add or remove songs |
 | **Reboot** | Restart the piano |
+| **Power** | Direct control of a linked, dedicated smart plug or outlet |
 | **Audio firmware** / **MIDI firmware** | Shows whether newer firmware is available |
 
 Plus a **Piano Playlists** panel in the sidebar for creating and editing playlists
@@ -154,12 +155,20 @@ run an MQTT broker this takes a few minutes.
 
 ### Link a power outlet
 
-If your piano is plugged into a smart plug, you can let Home Assistant turn it on and off
-with the media player's power button. Open the integration, click **Configure**, and pick
-the switch.
+If your piano is plugged into a smart plug, open the integration, click **Configure**, and
+pick the switch. The integration creates a separate **Power** switch on the piano device.
+It directly controls the linked outlet and remains usable while the piano is off, starting,
+warming up, synchronising its library, or disconnected from MQTT and HTTP.
 
-Home Assistant stops playback gracefully before cutting power, and waits for the piano to
-finish starting up after switching it on.
+The media player's power button uses that same outlet. If a ready piano is actively playing,
+Home Assistant first asks it to stop, then cuts power. During startup or a connection loss it
+cuts the outlet immediately instead of waiting for the piano to answer. Turning the outlet on
+starts the piano; reconnection, readiness, library sync, and any configured AutoPlay happen in
+the background.
+
+`off` means the linked outlet reports that power is cut. `unavailable` means Home Assistant
+cannot determine the linked outlet's state, or the piano itself is not ready for playback; it
+does not prevent the separate **Power** switch from controlling a known outlet.
 
 > **Only link an outlet that powers the piano alone.** Turning the piano off cuts power to
 > whatever you select here.

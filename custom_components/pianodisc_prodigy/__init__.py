@@ -27,11 +27,9 @@ PLATFORMS: list[Platform] = [
     Platform.SENSOR,
     Platform.BUTTON,
     Platform.SELECT,
+    Platform.SWITCH,
     Platform.UPDATE,
 ]
-# Older releases exposed shuffle as a separate switch. It is now a standard media
-# player control, but old entries need this platform explicitly unloaded on upgrade.
-_LEGACY_PLATFORMS: list[Platform] = [Platform.SWITCH]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> bool:
@@ -98,9 +96,7 @@ async def _async_register_playlist_editor(hass: HomeAssistant) -> None:
 
 async def async_unload_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(
-        entry, [*PLATFORMS, *_LEGACY_PLATFORMS]
-    )
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
 def _remove_legacy_shuffle_entity(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> None:
