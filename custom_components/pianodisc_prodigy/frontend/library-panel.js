@@ -17,9 +17,11 @@ class PianoDiscLibraryPanel extends HTMLElement {
     this._loading = false;
     this._playingPath = null;
     this._error = "";
+    this._libraryStatus = "syncing";
+    this._retryTimer = null;
   }
 
-  async _load() {
+  async _load(refresh = false) {
     if (!this._hass || this._loading) return;
     this._loading = true;
     this._error = "";
@@ -28,15 +30,18 @@ class PianoDiscLibraryPanel extends HTMLElement {
       const data = await this._hass.callWS({
         type: "pianodisc_prodigy/library_data",
         entity_id: this._entityId || undefined,
+        refresh,
       });
       this._entities = data.entities || [];
       this._entityId = data.entity_id;
       this._songs = data.songs || [];
+      this._libraryStatus = data.library_status || "ready";
     } catch (err) {
       this._error = err?.message || "Unable to load library";
     } finally {
       this._loading = false;
       this._render();
+      this._scheduleRetry();
     }
   }
 
@@ -74,9 +79,26 @@ class PianoDiscLibraryPanel extends HTMLElement {
     input?.setSelectionRange(value.length, value.length);
   }
 
+  _refresh() {
+    this._load(true);
+  }
+
+  _scheduleRetry() {
+    clearTimeout(this._retryTimer);
+    if (this._libraryStatus !== "ready") {
+      this._retryTimer = setTimeout(() => this._load(), 1500);
+    }
+  }
+
+  disconnectedCallback() {
+    clearTimeout(this._retryTimer);
+  }
+
   _render() {
-    const results = this._filteredSongs();
-    const disabled = this._loading || this._playingPath ? "disabled" : "";
+    const libraryReady = this._libraryStatus === "ready";
+    const results = libraryReady ? this._filteredSongs() : [];
+    const disabled = this._loading || this._playingPath || !libraryReady ? "disabled" : "";
+    const startupMessage = this._libraryStatus === "preparing" ? "Preparing piano..." : "Syncing library...";
     this.shadowRoot.innerHTML = `
       <style>
         :host { display:block; min-height:100vh; color:var(--primary-text-color); background:var(--primary-background-color); }
@@ -107,13 +129,15 @@ class PianoDiscLibraryPanel extends HTMLElement {
           <div class="tools">
             ${this._entities.length > 1 ? `<select data-action="entity" ${disabled}>${this._entities.map((entity) => `<option value="${this._escapeAttr(entity.entity_id)}" ${entity.entity_id === this._entityId ? "selected" : ""}>${this._escape(entity.name)}</option>`).join("")}</select>` : ""}
             <input data-action="query" type="search" autocomplete="off" placeholder="Search songs" value="${this._escapeAttr(this._query)}" ${disabled}>
+            <button data-action="refresh" title="Refresh library" aria-label="Refresh library" ${disabled}><ha-icon icon="mdi:refresh"></ha-icon></button>
           </div>
         </header>
         ${this._error ? `<p class="error">${this._escape(this._error)}</p>` : ""}
-        ${this._loading ? `<div class="panel empty">Loading...</div>` : results.length ? `<div class="panel">${results.map((song) => `<div class="song"><button data-play="${this._escapeAttr(song.path)}" title="Play ${this._escapeAttr(song.title)}" aria-label="Play ${this._escapeAttr(song.title)}" ${disabled}><ha-icon icon="mdi:play"></ha-icon></button><div class="song-title" title="${this._escapeAttr(song.path)}">${this._escape(song.title)}</div></div>`).join("")}</div>` : `<div class="panel empty">${this._songs.length ? "No matching songs" : "No songs available"}</div>`}
-        ${!this._loading ? `<p class="status">${results.length} of ${this._songs.length} songs</p>` : ""}
+        ${this._loading ? `<div class="panel empty">Loading...</div>` : !libraryReady ? `<div class="panel empty">${startupMessage}</div>` : results.length ? `<div class="panel">${results.map((song) => `<div class="song"><button data-play="${this._escapeAttr(song.path)}" title="Play ${this._escapeAttr(song.title)}" aria-label="Play ${this._escapeAttr(song.title)}" ${disabled}><ha-icon icon="mdi:play"></ha-icon></button><div class="song-title" title="${this._escapeAttr(song.path)}">${this._escape(song.title)}</div></div>`).join("")}</div>` : `<div class="panel empty">${this._songs.length ? "No matching songs" : "No songs available"}</div>`}
+        ${!this._loading && libraryReady ? `<p class="status">${results.length} of ${this._songs.length} songs</p>` : ""}
       </div>`;
     this.shadowRoot.querySelector("[data-action=query]")?.addEventListener("input", (event) => this._setQuery(event.target.value));
+    this.shadowRoot.querySelector("[data-action=refresh]")?.addEventListener("click", () => this._refresh());
     this.shadowRoot.querySelector("[data-action=entity]")?.addEventListener("change", (event) => { this._entityId = event.target.value; this._load(); });
     this.shadowRoot.querySelectorAll("[data-play]").forEach((button) => button.addEventListener("click", () => this._play(button.dataset.play)));
   }

@@ -50,6 +50,16 @@ type PianoDiscConfigEntry = ConfigEntry[PianoDiscCoordinator]
 _HA_DOMAIN = "homeassistant"
 
 
+def _format_device_sw_version(data: ProdigyData) -> str | None:
+    """Format the physical piano's two firmware versions for DeviceInfo."""
+    parts = []
+    if data.firmware_audio:
+        parts.append(f"audio {data.firmware_audio}")
+    if data.firmware_midi:
+        parts.append(f"MIDI {data.firmware_midi}")
+    return ", ".join(parts) or None
+
+
 class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
     """Owns the transport and publishes ``ProdigyData`` to entities.
 
@@ -169,20 +179,27 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
 
         self._retune_interval(data)
         self.async_set_updated_data(data)
-        self._update_device_configuration_url(data.ip_address)
+        self._update_device_registry(data)
         if became_ready:
             self._schedule_library_prefetch()
 
     @callback
-    def _update_device_configuration_url(self, ip_address: str | None) -> None:
-        """Keep the built-in device-card link aligned with MQTT's current IP."""
-        if ip_address is None:
-            return
+    def _update_device_registry(self, data: ProdigyData) -> None:
+        """Keep mutable device-card metadata aligned with retained MQTT metadata."""
         device_id = self.config_entry.unique_id or self.config_entry.data[CONF_DEVICE_ID]
         registry = dr.async_get(self.hass)
         device = registry.async_get_device(identifiers={(DOMAIN, device_id)})
-        if device is not None:
-            registry.async_update_device(device.id, configuration_url=f"http://{ip_address}")
+        if device is None:
+            return
+
+        changes: dict[str, str] = {}
+        if data.ip_address:
+            changes["configuration_url"] = f"http://{data.ip_address}"
+        version = _format_device_sw_version(data)
+        if version:
+            changes["sw_version"] = version
+        if changes:
+            registry.async_update_device(device.id, **changes)
 
     # -- library scan progress ---------------------------------------------
     @property

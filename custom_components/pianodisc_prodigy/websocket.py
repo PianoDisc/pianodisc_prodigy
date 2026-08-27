@@ -23,6 +23,15 @@ _WS_SAVE_AUTOPLAY = f"{DOMAIN}/save_autoplay"
 _WS_LIBRARY_DATA = f"{DOMAIN}/library_data"
 
 
+def _library_ui_status(coordinator: PianoDiscCoordinator) -> str:
+    """Return the startup state shared by all library-facing custom panels."""
+    if coordinator.hardware_warming or coordinator.getting_ready:
+        return "preparing"
+    if not coordinator.library_ready:
+        return "syncing"
+    return "ready"
+
+
 @callback
 def async_register_websocket_api(hass: HomeAssistant) -> None:
     """Register playlist editor websocket commands."""
@@ -54,6 +63,10 @@ async def websocket_playlist_data(
         return
 
     coordinator, entity_id = selected
+    library_status = _library_ui_status(coordinator)
+    if library_status != "ready":
+        connection.send_result(msg["id"], {"entity_id": entity_id, "entities": _media_player_entities(hass), "library_status": library_status, "playlists": [], "songs": []})
+        return
     try:
         if msg["refresh"]:
             # Refresh both caches, then return exactly those shared cache values.
@@ -69,6 +82,7 @@ async def websocket_playlist_data(
         {
             "entity_id": entity_id,
             "entities": _media_player_entities(hass),
+            "library_status": "ready",
             "playlists": playlists,
             "songs": songs,
         },
@@ -96,6 +110,10 @@ async def websocket_save_playlists(
         connection.send_error(msg["id"], "not_found", str(err))
         return
 
+    if _library_ui_status(coordinator) != "ready":
+        connection.send_error(msg["id"], "library_not_ready", "Library is not ready")
+        return
+
     playlists = [_normalize_playlist(item) for item in msg["playlists"]]
     try:
         await coordinator.async_save_playlist_definitions(playlists)
@@ -120,17 +138,23 @@ async def websocket_autoplay_data(hass: HomeAssistant, connection: websocket_api
     connection.send_result(msg["id"], {"entity_id": entity_id, "entities": _media_player_entities(hass), "playlists": playlists, "config": config})
 
 
-@websocket_api.websocket_command({vol.Required("type"): _WS_LIBRARY_DATA, vol.Optional("entity_id"): cv.entity_id})
+@websocket_api.websocket_command({vol.Required("type"): _WS_LIBRARY_DATA, vol.Optional("entity_id"): cv.entity_id, vol.Optional("refresh", default=False): cv.boolean})
 @websocket_api.async_response
 async def websocket_library_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
     """Return the cached library for the searchable library panel."""
     try:
         coordinator, entity_id = _coordinator_from_msg(hass, msg)
+        library_status = _library_ui_status(coordinator)
+        if library_status != "ready":
+            connection.send_result(msg["id"], {"entity_id": entity_id, "entities": _media_player_entities(hass), "library_status": library_status, "songs": []})
+            return
+        if msg["refresh"]:
+            await coordinator.async_refresh_library()
         paths = await coordinator.transport.async_fetch_song_paths()
     except Exception as err:
         connection.send_error(msg["id"], "library_load_failed", str(err))
         return
-    connection.send_result(msg["id"], {"entity_id": entity_id, "entities": _media_player_entities(hass), "songs": [{"title": title_from_path(path), "path": path} for path in paths]})
+    connection.send_result(msg["id"], {"entity_id": entity_id, "entities": _media_player_entities(hass), "library_status": "ready", "songs": [{"title": title_from_path(path), "path": path} for path in paths]})
 
 
 @websocket_api.websocket_command({vol.Required("type"): _WS_SAVE_AUTOPLAY, vol.Required("entity_id"): cv.entity_id, vol.Required("config"): dict})
