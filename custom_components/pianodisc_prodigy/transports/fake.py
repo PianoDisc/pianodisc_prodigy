@@ -75,6 +75,12 @@ class FakeTransport(Transport):
                 "content": {"include": [], "exclude": ["/sd/The Entertainer.mid"]},
             },
         ]
+        self.autoplay_config: dict[str, object] = {
+            "enable": False,
+            "playlist": 0,
+            "loop": False,
+            "sort": 0,
+        }
 
     # -- lifecycle ----------------------------------------------------------
     async def async_setup(self) -> None:
@@ -190,3 +196,9 @@ class FakeTransport(Transport):
     ) -> None:
         self.playlists = [dict(item) for item in playlists]
         self._update(source_list=await self.async_fetch_playlists())
+
+    async def async_fetch_autoplay_config(self) -> dict[str, object]:
+        return dict(self.autoplay_config)
+
+    async def async_save_autoplay_config(self, config: dict[str, object]) -> None:
+        self.autoplay_config = dict(config)

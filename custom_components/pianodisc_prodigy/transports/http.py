@@ -478,6 +478,15 @@ class HttpTransport(Transport):
             if isinstance(item.get("name"), str)
         ]
 
+    async def async_fetch_autoplay_config(self) -> dict[str, Any]:
+        await self._request("GET", "autoplay")
+        await self._sleep(PRIME_POLL_WAIT)
+        data = await self._get_json("autoplay")
+        return dict(data) if isinstance(data, dict) else {}
+
+    async def async_save_autoplay_config(self, config: dict[str, Any]) -> None:
+        await self._request("POST", "autoplay", json_body=config)
+
 
 def _as_str(value: Any) -> str | None:
     return str(value) if value not in (None, "") else None

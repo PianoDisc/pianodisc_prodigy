@@ -169,3 +169,11 @@ class Transport(ABC):
         self, playlists: list[dict[str, Any]]
     ) -> None:
         """Replace the device playlist set with ``playlists``."""
+
+    @abstractmethod
+    async def async_fetch_autoplay_config(self) -> dict[str, Any]:
+        """Return the persisted AutoPlay configuration."""
+
+    @abstractmethod
+    async def async_save_autoplay_config(self, config: dict[str, Any]) -> None:
+        """Persist the AutoPlay configuration."""

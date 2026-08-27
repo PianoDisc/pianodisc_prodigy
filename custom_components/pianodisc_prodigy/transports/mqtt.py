@@ -34,6 +34,8 @@ from ..const import (
     MAX_SCAN_PAGES,
     MQTT_PAYLOAD_OFFLINE,
     MQTT_TOPIC_BUSY,
+    MQTT_TOPIC_AUTOPLAY_REQUEST,
+    MQTT_TOPIC_AUTOPLAY_STATE,
     MQTT_TOPIC_COMMAND,
     MQTT_TOPIC_DEVICE_NAME,
     MQTT_TOPIC_LIBRARY_PAGE,
@@ -139,6 +141,7 @@ class MqttTransport(Transport):
         self._command_topic = f"{self._root}/{MQTT_TOPIC_COMMAND}"
         self._library_request_topic = f"{self._root}/{MQTT_TOPIC_LIBRARY_REQUEST}"
         self._playlist_request_topic = f"{self._root}/{MQTT_TOPIC_PLAYLIST_REQUEST}"
+        self._autoplay_request_topic = f"{self._root}/{MQTT_TOPIC_AUTOPLAY_REQUEST}"
         self._data = ProdigyData(ip_address=self._http_host)
         # State inputs. The displayed state is derived from these (see _derive_state).
         self._http_state: MediaPlayerState | None = None  # last /playerStatus state
@@ -162,6 +165,7 @@ class MqttTransport(Transport):
         self._closed = False
         self._library_waiters: dict[str, asyncio.Future[dict]] = {}
         self._playlist_waiters: dict[str, asyncio.Future[dict]] = {}
+        self._autoplay_waiters: dict[str, asyncio.Future[dict]] = {}
         self._song_titles: list[str] = []
         self._song_paths: list[str] = []
         self._song_cache_at: float | None = None
@@ -183,11 +187,13 @@ class MqttTransport(Transport):
             MQTT_TOPIC_UPDATE: self._on_update,
             MQTT_TOPIC_LIBRARY_PAGE: self._on_library_page,
             MQTT_TOPIC_PLAYLIST_STATE: self._on_playlist_state,
+            MQTT_TOPIC_AUTOPLAY_STATE: self._on_autoplay_state,
         }
         raw_json_topics = {
             MQTT_TOPIC_PLAYER_STATUS,
             MQTT_TOPIC_LIBRARY_PAGE,
             MQTT_TOPIC_PLAYLIST_STATE,
+            MQTT_TOPIC_AUTOPLAY_STATE,
         }
         for sub, handler in handlers.items():
             unsub = await mqtt.async_subscribe(
@@ -208,7 +214,7 @@ class MqttTransport(Transport):
             if cancel is not None:
                 cancel()
         self._cancel_watchdog = self._cancel_busy = None
-        for waiters in (self._library_waiters, self._playlist_waiters):
+        for waiters in (self._library_waiters, self._playlist_waiters, self._autoplay_waiters):
             for fut in waiters.values():
                 if not fut.done():
                     fut.cancel()
@@ -539,6 +545,21 @@ class MqttTransport(Transport):
         if not isinstance(request_id, str):
             return
         fut = self._playlist_waiters.pop(request_id, None)
+        if fut is not None and not fut.done():
+            fut.set_result(payload)
+
+    @callback
+    def _on_autoplay_state(self, msg: ReceiveMessage) -> None:
+        try:
+            payload = _json_payload(msg.payload)
+        except (ValueError, TypeError):
+            return
+        if not isinstance(payload, dict):
+            return
+        request_id = payload.get("id")
+        if not isinstance(request_id, str):
+            return
+        fut = self._autoplay_waiters.pop(request_id, None)
         if fut is not None and not fut.done():
             fut.set_result(payload)
 
@@ -1083,3 +1104,17 @@ class MqttTransport(Transport):
         ]
         self._playlist_names = names
         self._push(source_list=names)
+
+    async def async_fetch_autoplay_config(self) -> dict[str, object]:
+        payload = await self._request_response(self._autoplay_request_topic, self._autoplay_waiters, {"op": "get"})
+        config = payload.get("config") if isinstance(payload, dict) else None
+        if isinstance(config, dict):
+            return dict(config)
+        if self._http is not None:
+            return await self._http.async_fetch_autoplay_config()
+        return {}
+
+    async def async_save_autoplay_config(self, config: dict[str, object]) -> None:
+        payload = await self._request_response(self._autoplay_request_topic, self._autoplay_waiters, {"op": "set", "config": config})
+        if payload is None and self._http is not None:
+            await self._http.async_save_autoplay_config(config)

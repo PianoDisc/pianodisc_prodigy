@@ -21,7 +21,6 @@ from .transports.http import HttpTransport
 from .transports.mqtt import MqttTransport
 from .websocket import async_register_websocket_api
 
-# Remaining aux platforms (event, autoplay select) land next.
 PLATFORMS: list[Platform] = [
     Platform.MEDIA_PLAYER,
     Platform.BINARY_SENSOR,
@@ -61,7 +60,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) ->
 
 
 async def _async_register_playlist_editor(hass: HomeAssistant) -> None:
-    """Expose the user-facing playlist editor panel and its websocket API."""
+    """Expose the user-facing playlist and AutoPlay editor panels."""
     data = hass.data.setdefault(DOMAIN, {})
     if data.get("playlist_editor_registered"):
         return
@@ -76,6 +75,7 @@ async def _async_register_playlist_editor(hass: HomeAssistant) -> None:
                 str(frontend_dir / "playlist-panel.js"),
                 cache_headers=False,
             ),
+            StaticPathConfig(f"/{DOMAIN}/autoplay-panel.js", str(frontend_dir / "autoplay-panel.js"), cache_headers=False),
             StaticPathConfig(
                 f"/{DOMAIN}/default-album-art.png",
                 str(Path(__file__).with_name("brand") / "default-album-art.png"),
@@ -92,6 +92,7 @@ async def _async_register_playlist_editor(hass: HomeAssistant) -> None:
         module_url=f"/{DOMAIN}/playlist-panel.js",
         require_admin=False,
     )
+    await async_register_panel(hass, frontend_url_path="pianodisc-autoplay", webcomponent_name="pianodisc-autoplay-panel", sidebar_title="Piano AutoPlay", sidebar_icon="mdi:play-circle-outline", module_url=f"/{DOMAIN}/autoplay-panel.js", require_admin=False)
     data["playlist_editor_registered"] = True
 
 

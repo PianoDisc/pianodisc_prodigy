@@ -54,6 +54,8 @@ MQTT_TOPIC_LIBRARY_REQUEST: Final = "library/request"
 MQTT_TOPIC_LIBRARY_PAGE: Final = "library/page"
 MQTT_TOPIC_PLAYLIST_REQUEST: Final = "playlist/request"
 MQTT_TOPIC_PLAYLIST_STATE: Final = "playlist/state"
+MQTT_TOPIC_AUTOPLAY_REQUEST: Final = "autoplay/request"
+MQTT_TOPIC_AUTOPLAY_STATE: Final = "autoplay/state"
 
 # Availability payloads on .../ready. CR#2: firmware registers an MQTT Last-Will of
 # "OFFLINE" (retained) so the broker announces an ungraceful disconnect instantly;
