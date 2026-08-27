@@ -120,11 +120,9 @@ SCAN_INTERVAL_SYNCING: Final = timedelta(seconds=10)
 # Availability watchdog (MQTT mode): treat absence of .../ready as offline.
 READY_WATCHDOG: Final = timedelta(seconds=75)
 
-# Power-link (optional dedicated outlet). When a switch is linked, TURN_ON energizes it
-# and waits up to POWER_ON_TIMEOUT for the piano to come online; TURN_OFF gracefully
-# stops, waits POWER_OFF_SETTLE, then de-energizes. See [[power-architecture]].
-POWER_ON_TIMEOUT: Final = 90  # seconds to wait for the piano after energizing
-POWER_ON_POLL: Final = 3.0  # seconds between availability checks during that wait
+# Power-link (optional dedicated outlet). The outlet itself is always independent of
+# piano connectivity. This deadline only bounds the media card's "Getting ready" state.
+POWER_ON_TIMEOUT: Final = 90
 POWER_OFF_SETTLE: Final = 1.0  # seconds between the graceful Stop and cutting power
 
 # Autoplay publishes per-note .../busy bursts. Hold PLAYING this long after the last

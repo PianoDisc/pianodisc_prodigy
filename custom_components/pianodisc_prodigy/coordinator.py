@@ -23,8 +23,6 @@ from homeassistant.core import (
     State,
     callback,
 )
-from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -36,7 +34,6 @@ from .const import (
     DOMAIN,
     LOGGER,
     POWER_OFF_SETTLE,
-    POWER_ON_POLL,
     POWER_ON_TIMEOUT,
     SCAN_INTERVAL_DISCONNECTED,
     SCAN_INTERVAL_IDLE,
@@ -413,78 +410,57 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
             busy=None,
         )
 
-    async def async_power_on(self) -> None:
-        """Energize the linked outlet and wait for the piano to come online."""
+    def _apply_power_state(self, on: bool) -> None:
+        """Update local state after a successful command to the external outlet."""
+        self.power_on = on
+        if on:
+            # The outlet is authoritative. Reconnection is background work and must
+            # never make an on/off service call wait for the piano itself.
+            self.transport.invalidate()
+            self._powering_on_until = self.hass.loop.time() + POWER_ON_TIMEOUT
+            self.async_set_updated_data(self._blank_snapshot())
+            self.hass.async_create_task(self.async_refresh())
+        else:
+            self._powering_on_until = 0.0
+            self.async_update_listeners()
+
+    async def async_set_outlet_power(self, on: bool) -> None:
+        """Operate the linked outlet without requiring piano connectivity."""
         if self.power_switch is None:
             return
         await self.hass.services.async_call(
             _HA_DOMAIN,
-            SERVICE_TURN_ON,
+            SERVICE_TURN_ON if on else SERVICE_TURN_OFF,
             {ATTR_ENTITY_ID: self.power_switch},
             blocking=True,
         )
-        # Forget stale state from before the power cycle and show "starting" at once.
-        self.transport.invalidate()
-        self.power_on = True
-        self._powering_on_until = self.hass.loop.time() + POWER_ON_TIMEOUT
-        self.async_set_updated_data(self._blank_snapshot())
-        if await self._async_wait_until_available(POWER_ON_TIMEOUT):
-            self._powering_on_until = 0.0
-            ir.async_delete_issue(self.hass, DOMAIN, self._power_issue_id)
-            return
-        self._powering_on_until = 0.0
-        ir.async_create_issue(
-            self.hass,
-            DOMAIN,
-            self._power_issue_id,
-            is_fixable=False,
-            severity=ir.IssueSeverity.WARNING,
-            translation_key="power_on_timeout",
-            translation_placeholders={
-                "name": self.config_entry.title,
-                "switch": self.power_switch,
-            },
-        )
-        raise HomeAssistantError(
-            translation_domain=DOMAIN,
-            translation_key="power_on_timeout",
-            translation_placeholders={"seconds": str(POWER_ON_TIMEOUT)},
-        )
+        # A normal HA state-change event already applies this state. Test doubles and
+        # some optimistic outlet integrations may not emit one, so cover that case.
+        if self.power_on is not on:
+            self._apply_power_state(on)
+
+    async def async_power_on(self) -> None:
+        """Turn on the linked outlet; piano reconnection continues in background."""
+        await self.async_set_outlet_power(True)
 
     async def async_power_off(self) -> None:
-        """Gracefully stop playback, let it settle, then cut power to the outlet."""
+        """Stop only a confirmed live player, then always cut the outlet power."""
         if self.power_switch is None:
             return
-        try:
-            await self.transport.async_stop()
-        except Exception as err:  # cut power even if the graceful stop didn't land
-            LOGGER.debug("Stop before power-off failed (%s); cutting power anyway", err)
-        await asyncio.sleep(POWER_OFF_SETTLE)
-        await self.hass.services.async_call(
-            _HA_DOMAIN,
-            SERVICE_TURN_OFF,
-            {ATTR_ENTITY_ID: self.power_switch},
-            blocking=True,
+        data = self.data
+        can_stop = (
+            data is not None
+            and data.available
+            and data.readiness in {"READY", "OK"}
+            and data.state in {MediaPlayerState.PLAYING, MediaPlayerState.PAUSED}
         )
-        self.power_on = False
-        self._powering_on_until = 0.0
-        self.async_update_listeners()
-
-    async def _async_wait_until_available(self, seconds: float) -> bool:
-        """Poll until the piano reports a real playback state, or ``seconds`` elapse."""
-        loop = asyncio.get_running_loop()
-        deadline = loop.time() + seconds
-        while True:
-            await self.async_refresh()
-            if self.data is not None and self.data.state is not None:
-                return True
-            if loop.time() >= deadline:
-                return False
-            await asyncio.sleep(POWER_ON_POLL)
-
-    @property
-    def _power_issue_id(self) -> str:
-        return f"power_on_timeout_{self.config_entry.entry_id}"
+        if can_stop:
+            try:
+                await self.transport.async_stop()
+                await asyncio.sleep(POWER_OFF_SETTLE)
+            except Exception as err:
+                LOGGER.debug("Stop before power-off failed (%s); cutting power anyway", err)
+        await self.async_set_outlet_power(False)
 
     async def async_shutdown(self) -> None:
         await super().async_shutdown()

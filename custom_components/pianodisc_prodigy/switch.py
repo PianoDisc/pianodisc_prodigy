@@ -1,4 +1,4 @@
-"""Switch platform — the piano's device-level shuffle (playback order)."""
+"""Switch platform — independent control for a linked external power outlet."""
 
 from __future__ import annotations
 
@@ -20,22 +20,16 @@ async def async_setup_entry(
     entry: PianoDiscConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the device-level shuffle switch."""
-    async_add_entities([PianoDiscShuffleSwitch(entry.runtime_data)])
+    """Expose a power proxy only when the user linked an external outlet."""
+    if entry.runtime_data.power_linked:
+        async_add_entities([PianoDiscPowerSwitch(entry.runtime_data)])
 
 
-class PianoDiscShuffleSwitch(PianoDiscEntity, SwitchEntity):
-    """Device-level shuffle (the firmware's ``sort``), exposed as a switch.
+class PianoDiscPowerSwitch(PianoDiscEntity, SwitchEntity):
+    """Power proxy whose availability never depends on the piano transport."""
 
-    Deliberately NOT the media_player SHUFFLE_SET button: shuffle here is a *persistent
-    device setting* (on by default), so it must stay toggleable even when idle. The
-    media card only renders its shuffle control during active playback, which made it
-    one-way (toggle off → the button vanishes → no way back). A switch is always
-    available and clearly on/off. See device captures.
-    """
-
-    _attr_translation_key = "shuffle"
-    _attr_icon = "mdi:shuffle"
+    _attr_translation_key = "power"
+    _attr_icon = "mdi:power-socket"
 
     def __init__(self, coordinator: PianoDiscCoordinator) -> None:
         super().__init__(coordinator)
@@ -43,23 +37,20 @@ class PianoDiscShuffleSwitch(PianoDiscEntity, SwitchEntity):
             coordinator.config_entry.unique_id
             or coordinator.config_entry.data[CONF_DEVICE_ID]
         )
-        self._attr_unique_id = f"{device_id}_shuffle"
+        self._attr_unique_id = f"{device_id}_power"
 
     @property
     def available(self) -> bool:
-        # Reachable AND the piano has actually reported a sort value.
-        return super().available and self.coordinator.data.shuffle is not None
+        # This entity represents the linked outlet, not the piano. It stays usable
+        # throughout boot, WARMING_UP, library syncing and a lost MQTT/HTTP link.
+        return self.coordinator.power_on is not None
 
     @property
     def is_on(self) -> bool | None:
-        return self.coordinator.data.shuffle
+        return self.coordinator.power_on
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        await self._set_shuffle(True)
+        await self.coordinator.async_set_outlet_power(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        await self._set_shuffle(False)
-
-    async def _set_shuffle(self, shuffle: bool) -> None:
-        await self.coordinator.transport.async_set_shuffle(shuffle)
-        await self.coordinator.async_request_refresh()
+        await self.coordinator.async_set_outlet_power(False)
