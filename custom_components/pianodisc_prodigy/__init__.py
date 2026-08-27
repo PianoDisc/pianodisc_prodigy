@@ -74,6 +74,7 @@ async def _async_register_playlist_editor(hass: HomeAssistant) -> None:
                 cache_headers=False,
             ),
             StaticPathConfig(f"/{DOMAIN}/autoplay-panel.js", str(frontend_dir / "autoplay-panel.js"), cache_headers=False),
+            StaticPathConfig(f"/{DOMAIN}/library-panel.js", str(frontend_dir / "library-panel.js"), cache_headers=False),
             StaticPathConfig(
                 f"/{DOMAIN}/default-album-art.png",
                 str(Path(__file__).with_name("brand") / "default-album-art.png"),
@@ -91,6 +92,7 @@ async def _async_register_playlist_editor(hass: HomeAssistant) -> None:
         require_admin=False,
     )
     await async_register_panel(hass, frontend_url_path="pianodisc-autoplay", webcomponent_name="pianodisc-autoplay-panel", sidebar_title="Piano AutoPlay", sidebar_icon="mdi:play-circle-outline", module_url=f"/{DOMAIN}/autoplay-panel.js", require_admin=False)
+    await async_register_panel(hass, frontend_url_path="pianodisc-library", webcomponent_name="pianodisc-library-panel", sidebar_title="Piano Library", sidebar_icon="mdi:music-note-search", module_url=f"/{DOMAIN}/library-panel.js", require_admin=False)
     data["playlist_editor_registered"] = True
 
 

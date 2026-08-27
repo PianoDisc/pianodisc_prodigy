@@ -20,6 +20,7 @@ _WS_DATA = f"{DOMAIN}/playlist_data"
 _WS_SAVE = f"{DOMAIN}/save_playlists"
 _WS_AUTOPLAY_DATA = f"{DOMAIN}/autoplay_data"
 _WS_SAVE_AUTOPLAY = f"{DOMAIN}/save_autoplay"
+_WS_LIBRARY_DATA = f"{DOMAIN}/library_data"
 
 
 @callback
@@ -29,6 +30,7 @@ def async_register_websocket_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, websocket_save_playlists)
     websocket_api.async_register_command(hass, websocket_autoplay_data)
     websocket_api.async_register_command(hass, websocket_save_autoplay)
+    websocket_api.async_register_command(hass, websocket_library_data)
 
 
 @websocket_api.websocket_command(
@@ -116,6 +118,19 @@ async def websocket_autoplay_data(hass: HomeAssistant, connection: websocket_api
         connection.send_error(msg["id"], "autoplay_load_failed", str(err))
         return
     connection.send_result(msg["id"], {"entity_id": entity_id, "entities": _media_player_entities(hass), "playlists": playlists, "config": config})
+
+
+@websocket_api.websocket_command({vol.Required("type"): _WS_LIBRARY_DATA, vol.Optional("entity_id"): cv.entity_id})
+@websocket_api.async_response
+async def websocket_library_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """Return the cached library for the searchable library panel."""
+    try:
+        coordinator, entity_id = _coordinator_from_msg(hass, msg)
+        paths = await coordinator.transport.async_fetch_song_paths()
+    except Exception as err:
+        connection.send_error(msg["id"], "library_load_failed", str(err))
+        return
+    connection.send_result(msg["id"], {"entity_id": entity_id, "entities": _media_player_entities(hass), "songs": [{"title": title_from_path(path), "path": path} for path in paths]})
 
 
 @websocket_api.websocket_command({vol.Required("type"): _WS_SAVE_AUTOPLAY, vol.Required("entity_id"): cv.entity_id, vol.Required("config"): dict})
