@@ -10,6 +10,7 @@ signal. Decoding mirrors the Calibrate app: ISO-8859-1 then strip control bytes.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 from typing import Any
 
@@ -74,6 +75,7 @@ class HttpTransport(Transport):
     def __init__(self, session: ClientSession, host: str) -> None:
         super().__init__()
         self._session = session
+        self._host = host
         self._base = f"http://{host}"
         self._sem = asyncio.Semaphore(HTTP_SOCKET_LIMIT)
         self._sleep = asyncio.sleep  # injectable for tests
@@ -87,6 +89,15 @@ class HttpTransport(Transport):
         # the device's reading catches up (or grace lapses) so the switch sticks.
         self._shuffle_target: bool | None = None
         self._shuffle_hold_until = 0.0
+
+    @property
+    def ip_address(self) -> str | None:
+        """Return the configured host only when it is a literal IPv4 address."""
+        try:
+            address = ipaddress.ip_address(self._host)
+        except ValueError:
+            return None
+        return str(address) if address.version == 4 and not address.is_unspecified else None
 
     # -- lifecycle ----------------------------------------------------------
     async def async_setup(self) -> None:
@@ -240,6 +251,7 @@ class HttpTransport(Transport):
             autoplay_loop=autoplay_loop,
             source=source,
             busy=None,  # no HTTP equivalent
+            ip_address=self.ip_address,
             # device_name left None: the per-unit name comes from the entry / MQTT.
             source_list=list(self._playlist_names),
         )
