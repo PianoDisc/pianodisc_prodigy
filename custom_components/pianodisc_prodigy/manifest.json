@@ -15,5 +15,5 @@
   "issue_tracker": "https://github.com/PianoDisc/pianodisc_prodigy/issues",
   "mqtt": ["PianoDisc-Prodigy/+/ready"],
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.1.3"
 }

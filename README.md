@@ -113,8 +113,10 @@ One **PianoDisc Prodigy II** device with these controls:
 | **Power** | Direct control of a linked, dedicated smart plug or outlet |
 | **Audio firmware** / **MIDI firmware** | Shows whether newer firmware is available |
 
-Plus a **Piano Playlists** panel in the sidebar for creating and editing playlists
-without touching the SD card by hand.
+Plus three sidebar workspaces: **Piano Library** for cached title search and direct song
+playback, **Piano Playlists** for creating and editing playlists without touching the SD
+card by hand, and **Piano AutoPlay** for choosing the playlist, order, and loop policy
+used after startup.
 
 <!-- SCREENSHOT: the Piano Playlists panel -->
 
