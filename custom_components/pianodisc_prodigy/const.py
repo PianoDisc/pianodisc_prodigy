@@ -39,6 +39,7 @@ MQTT_TOPIC_BUSY: Final = "busy"  # "true"/"false" (solenoids striking)
 MQTT_TOPIC_VOLUME: Final = "volume"  # percent string "0".."100" (not MIDI 0..127)
 MQTT_TOPIC_PLAYER_STATUS: Final = "player/status"  # retained /playerStatus JSON
 MQTT_TOPIC_DEVICE_NAME: Final = "deviceName"
+MQTT_TOPIC_NETWORK: Final = "network"  # retained {"ip":"192.0.2.10"}
 MQTT_TOPIC_MSC: Final = "msc"  # JSON {"command":"GO|STOP|FIRE","cue":"NNN"}
 # CR#3: retained {"audio":"x.y.z","midi":"x.y.z"} so MQTT-only installs (no HTTP
 # IP) still learn the firmware versions that HTTP /debugJson otherwise provides.

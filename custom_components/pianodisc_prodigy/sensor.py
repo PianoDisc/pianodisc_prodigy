@@ -34,6 +34,7 @@ async def async_setup_entry(
             PianoDiscLibraryStatusSensor(entry.runtime_data),
             PianoDiscPlaylistStatusSensor(entry.runtime_data),
             PianoDiscReadinessSensor(entry.runtime_data),
+            PianoDiscIpAddressSensor(entry.runtime_data),
         ]
     )
 
@@ -152,3 +153,27 @@ class PianoDiscReadinessSensor(PianoDiscEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, str]:
         return {"library_status": self.coordinator.library_status}
+
+
+class PianoDiscIpAddressSensor(PianoDiscEntity, SensorEntity):
+    """Expose the current LAN address advertised by the ESP over MQTT."""
+
+    _attr_name = "IP address"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:ip-network"
+
+    def __init__(self, coordinator: PianoDiscCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = (
+            coordinator.config_entry.unique_id
+            or coordinator.config_entry.data[CONF_DEVICE_ID]
+        )
+        self._attr_unique_id = f"{device_id}_ip_address"
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    @property
+    def native_value(self) -> str | None:
+        return self.coordinator.data.ip_address

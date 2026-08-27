@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+import ipaddress
 import json
 import uuid
 
@@ -23,6 +24,7 @@ from homeassistant.components import mqtt
 from homeassistant.components.media_player import MediaPlayerState
 from homeassistant.components.mqtt import ReceiveMessage
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 
@@ -36,6 +38,7 @@ from ..const import (
     MQTT_TOPIC_DEVICE_NAME,
     MQTT_TOPIC_LIBRARY_PAGE,
     MQTT_TOPIC_LIBRARY_REQUEST,
+    MQTT_TOPIC_NETWORK,
     MQTT_TOPIC_PLAYER_STATUS,
     MQTT_TOPIC_PLAYLIST_REQUEST,
     MQTT_TOPIC_PLAYLIST_STATE,
@@ -131,6 +134,7 @@ class MqttTransport(Transport):
         super().__init__()
         self._hass = hass
         self._http = http
+        self._http_host: str | None = None
         self._root = f"{MQTT_TOPIC_ROOT}/{device_id}"
         self._command_topic = f"{self._root}/{MQTT_TOPIC_COMMAND}"
         self._library_request_topic = f"{self._root}/{MQTT_TOPIC_LIBRARY_REQUEST}"
@@ -174,6 +178,7 @@ class MqttTransport(Transport):
             MQTT_TOPIC_VOLUME: self._on_volume,
             MQTT_TOPIC_READY: self._on_ready,
             MQTT_TOPIC_DEVICE_NAME: self._on_device_name,
+            MQTT_TOPIC_NETWORK: self._on_network,
             MQTT_TOPIC_VERSION: self._on_version,
             MQTT_TOPIC_UPDATE: self._on_update,
             MQTT_TOPIC_LIBRARY_PAGE: self._on_library_page,
@@ -422,6 +427,32 @@ class MqttTransport(Transport):
         self._push(
             device_name=str(msg.payload).strip() or None, available=self._avail(msg)
         )
+
+    @callback
+    def _on_network(self, msg: ReceiveMessage) -> None:
+        """Adopt the retained LAN address without treating it as liveness."""
+        try:
+            payload = _json_payload(msg.payload)
+        except (ValueError, TypeError):
+            return
+        if not isinstance(payload, dict) or not isinstance(payload.get("ip"), str):
+            return
+        try:
+            address = ipaddress.ip_address(payload["ip"])
+        except ValueError:
+            return
+        if address.version != 4 or address.is_unspecified:
+            return
+
+        host = str(address)
+        if self._http_host != host:
+            self._http = HttpTransport(async_get_clientsession(self._hass), host)
+            self._http_host = host
+            if self._library_progress is not None:
+                self._http.set_library_progress_listener(self._library_progress)
+        # Retained metadata must not revive an offline device. Readiness remains
+        # the liveness authority; this only gives HA the current LAN endpoint.
+        self._push(ip_address=host, available=self._data.available)
 
     @callback
     def _on_volume(self, msg: ReceiveMessage) -> None:
@@ -843,6 +874,12 @@ class MqttTransport(Transport):
             self._emit(self._data)
             return
         await self._http.async_reboot()
+
+    async def async_fetch_debug_json(self) -> dict[str, object] | None:
+        """Raw diagnostics are a local HTTP-only read, never a MQTT upload."""
+        if self._http is None:
+            return None
+        return await self._http.async_fetch_debug_json()
 
     # -- snapshot (HTTP fallback/backfill) + library -----------------------
     async def async_fetch_snapshot(self) -> ProdigyData:

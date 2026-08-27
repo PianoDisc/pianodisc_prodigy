@@ -46,6 +46,7 @@ class ProdigyData:
 
     # Device metadata
     device_name: str | None = None
+    ip_address: str | None = None
     firmware_audio: str | None = None
     firmware_midi: str | None = None
     # Latest available firmware from the device's backend check (CR#3 ②, MQTT

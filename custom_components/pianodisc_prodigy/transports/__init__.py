@@ -59,6 +59,14 @@ class Transport(ABC):
     async def async_fetch_snapshot(self) -> ProdigyData:
         """Return the current best-effort full state (the coordinator poll path)."""
 
+    async def async_fetch_debug_json(self) -> dict[str, Any] | None:
+        """Collect an on-demand raw piano diagnostic snapshot, when supported.
+
+        This is deliberately not part of regular polling. Home Assistant calls it
+        only while the user explicitly downloads diagnostics.
+        """
+        return None
+
     # -- push (push transports override; pollers leave the default no-op) ----
     def set_push_listener(self, listener: PushListener) -> None:
         """Register the coordinator callback for out-of-band state changes."""
