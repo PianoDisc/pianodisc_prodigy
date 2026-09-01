@@ -70,6 +70,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) ->
 async def _async_register_frontend(hass: HomeAssistant) -> None:
     """Register the playlist editor as a Lovelace custom-card resource."""
     data = hass.data.setdefault(DOMAIN, {})
+    module_url = f"/{DOMAIN}/playlist-panel.js"
     # v0.1.3 exposed global panels. Remove them on upgrade/reload so the old sidebar
     # entries do not linger after the editor becomes a dashboard card.
     for legacy_panel in (
@@ -79,6 +80,10 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
     ):
         async_remove_panel(hass, legacy_panel, warn_if_unknown=False)
     if data.get("frontend_registered"):
+        # An integration reload can happen in the same HA process that previously ran
+        # the old sidebar implementation. The static route is already present, but the
+        # new Lovelace resource still needs to be created.
+        await _async_register_lovelace_resource(hass, module_url)
         return
     await async_setup_component(hass, "http", {})
     await async_setup_component(hass, "frontend", {})
@@ -101,7 +106,6 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
     # ``frontend`` normally creates this set during setup. Keep registration safe for
     # minimal/headless HA installations too, where the visual frontend is unavailable.
     hass.data.setdefault(DATA_EXTRA_MODULE_URL, set())
-    module_url = f"/{DOMAIN}/playlist-panel.js"
     add_extra_js_url(hass, module_url)
     await _async_register_lovelace_resource(hass, module_url)
     data["frontend_registered"] = True
