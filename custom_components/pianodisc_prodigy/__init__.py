@@ -52,6 +52,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) ->
     await coordinator.async_config_entry_first_refresh()
 
     _remove_legacy_shuffle_entity(hass, entry)
+    _remove_legacy_power_proxy_entity(hass, entry)
 
     entry.runtime_data = coordinator
     # An options change (linking/unlinking the power outlet) reloads the entry so the
@@ -153,6 +154,17 @@ def _remove_legacy_shuffle_entity(hass: HomeAssistant, entry: PianoDiscConfigEnt
     device_id = entry.unique_id or entry.data[CONF_DEVICE_ID]
     registry = er.async_get(hass)
     entity_id = registry.async_get_entity_id("switch", DOMAIN, f"{device_id}_shuffle")
+    if entity_id is not None:
+        registry.async_remove(entity_id)
+
+
+def _remove_legacy_power_proxy_entity(
+    hass: HomeAssistant, entry: PianoDiscConfigEntry
+) -> None:
+    """Remove the retired duplicate switch for a linked power outlet."""
+    device_id = entry.unique_id or entry.data[CONF_DEVICE_ID]
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id("switch", DOMAIN, f"{device_id}_power")
     if entity_id is not None:
         registry.async_remove(entity_id)
 
