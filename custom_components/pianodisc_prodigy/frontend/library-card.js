@@ -41,7 +41,11 @@ class PianoDiscLibraryCard extends HTMLElement {
   }
 
   async _load() {
-    if (!this._hass || !this._entityId) return;
+    if (!this._hass) return;
+    if (!this._entityId) {
+      this._render();
+      return;
+    }
     this._loading = true;
     this._error = "";
     this._render();
@@ -75,9 +79,19 @@ class PianoDiscLibraryCard extends HTMLElement {
   }
 
   _render() {
-    const query = this._query.casefold().trim();
+    if (!this._entityId) {
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host { display: block; }
+          .empty { padding: 24px; color: var(--secondary-text-color); text-align: center; }
+        </style>
+        <ha-card><div class="empty">Select a Piano media player in the card configuration.</div></ha-card>
+      `;
+      return;
+    }
+    const query = this._query.toLocaleLowerCase().trim();
     const songs = this._songs.filter((song) =>
-      !query || song.title.casefold().includes(query)
+      !query || song.title.toLocaleLowerCase().includes(query)
     );
     const body = this._loading
       ? '<div class="empty">Loading library...</div>'
