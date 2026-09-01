@@ -26,7 +26,7 @@ edit playlists from your own dashboard.
 
 [![Release](https://img.shields.io/github/v/release/PianoDisc/pianodisc_prodigy?style=flat-square)](https://github.com/PianoDisc/pianodisc_prodigy/releases)
 [![HACS custom repository](https://img.shields.io/badge/HACS-Custom-41BDF5?style=flat-square)](https://hacs.xyz/)
-[![Home Assistant 2024.12+](https://img.shields.io/badge/Home%20Assistant-2024.12%2B-41BDF5?style=flat-square)](https://www.home-assistant.io/)
+[![Home Assistant 2026.3+](https://img.shields.io/badge/Home%20Assistant-2026.3%2B-41BDF5?style=flat-square)](https://www.home-assistant.io/)
 
 <!-- SCREENSHOT: hero — the media player card mid-playback -->
 
@@ -34,7 +34,7 @@ edit playlists from your own dashboard.
 
 You need:
 
-- **Home Assistant 2024.12** (or newer)
+- **Home Assistant 2026.3** (or newer)
 - **HACS** — if you don't have it yet, follow the
   [official HACS download guide](https://www.hacs.xyz/docs/use/download/download/)
 - Your **Prodigy II powered on** and connected to the same network as Home Assistant
