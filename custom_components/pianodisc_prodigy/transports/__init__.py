@@ -33,6 +33,10 @@ PushListener = Callable[[ProdigyData], None]
 #: status push must never clobber the running scan count).
 LibraryProgressListener = Callable[[int, bool], None]
 
+#: A transport invokes this for each MSC cue. This is event-shaped, so it must not
+#: travel through ``ProdigyData`` where consecutive cues could be coalesced.
+MscListener = Callable[[str, str], None]
+
 
 class Transport(ABC):
     """Contract every transport implements."""
@@ -40,10 +44,16 @@ class Transport(ABC):
     def __init__(self) -> None:
         self._push_listener: PushListener | None = None
         self._library_progress: LibraryProgressListener | None = None
+        self._msc_listener: MscListener | None = None
 
     @property
     def uses_push_updates(self) -> bool:
         """True when the transport receives live status without coordinator polling."""
+        return False
+
+    @property
+    def supports_msc(self) -> bool:
+        """True when this transport can receive live MIDI Show Control cues."""
         return False
 
     # -- lifecycle ----------------------------------------------------------
@@ -88,6 +98,14 @@ class Transport(ABC):
     def _emit_library_progress(self, count: int, scanning: bool) -> None:
         if self._library_progress is not None:
             self._library_progress(count, scanning)
+
+    def set_msc_listener(self, listener: MscListener) -> None:
+        """Register the coordinator callback for individual MSC cue messages."""
+        self._msc_listener = listener
+
+    def _emit_msc(self, command: str, cue: str) -> None:
+        if self._msc_listener is not None:
+            self._msc_listener(command, cue)
 
     def invalidate(self) -> None:  # noqa: B027 - optional hook, default is a no-op
         """Drop cached liveness so the next snapshot re-seeds (after a power cycle).

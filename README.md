@@ -106,6 +106,7 @@ One **PianoDisc Prodigy II** device with these controls:
 | **Piano** (media player) | Play, pause, stop, skip, volume, and browse the SD-card library |
 | **Playlist** | Pick a playlist and start it immediately |
 | **Piano active** | On while the player system is playing the piano — [needs MQTT](docs/mqtt.md) |
+| **Show Control** | Optional MSC cue channels and FIRE events from MSC-enabled MIDI files — [needs MQTT](docs/mqtt.md) |
 | **Library** | How many songs are on the SD card, and whether a scan is running |
 | **Readiness** | Whether the piano has finished starting up and is safe to play |
 | **Refresh library** | Re-scan the SD card after you add or remove songs |

@@ -89,6 +89,49 @@ it does, so short gaps between songs won't flicker your lights.
 
 Requires [MQTT](mqtt.md).
 
+## MIDI Show Control cues
+
+MSC-enabled MIDI files can trigger automations without YAML on the piano itself. Cue N is
+channel N. A `GO` cue turns a channel on, a `STOP` cue turns it off, and a `FIRE` cue
+triggers the matching event entity.
+
+```yaml
+alias: Cue 1 lights
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.piano_show_control_msc_channel_1
+    to: "on"
+actions:
+  - action: light.turn_on
+    target:
+      entity_id: light.stage
+```
+
+```yaml
+alias: Cue 2 fog
+triggers:
+  - trigger: state
+    entity_id: event.piano_show_control_msc_channel_2_fire
+actions:
+  - action: scene.turn_on
+    target:
+      entity_id: scene.fog
+```
+
+For every valid cue, including channels outside your configured range, Home Assistant
+also fires the `pianodisc_prodigy_msc` bus event:
+
+```yaml
+triggers:
+  - trigger: event
+    event_type: pianodisc_prodigy_msc
+    event_data:
+      command: FIRE
+      cue: "042"
+```
+
+Its `device_id` is the PianoDisc MAC-derived ID, not Home Assistant's device registry ID.
+
 ## Wait until the piano is ready before playing
 
 A piano that's been powered off isn't ready the moment it appears on the network. If your
