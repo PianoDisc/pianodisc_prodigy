@@ -20,6 +20,13 @@ class PianoDiscPlaylistCard extends HTMLElement {
     return 12;
   }
 
+  getGridOptions() {
+    return {
+      columns: 12,
+      min_columns: 6,
+    };
+  }
+
   static getStubConfig() {
     return { type: "custom:pianodisc-playlist-card" };
   }
@@ -377,9 +384,12 @@ class PianoDiscPlaylistCard extends HTMLElement {
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
+        :host {
+          container-type: inline-size;
+        }
         .layout {
           display: grid;
-          grid-template-columns: 300px minmax(0, 1fr);
+          grid-template-columns: minmax(260px, 0.75fr) minmax(480px, 1.25fr);
           gap: 16px;
         }
         .layout.loading-active {
@@ -406,14 +416,31 @@ class PianoDiscPlaylistCard extends HTMLElement {
         .playlist-row {
           display: grid;
           grid-template-columns: minmax(0, 1fr) 40px;
-          gap: 4px;
+          gap: 6px;
           align-items: center;
           width: 100%;
-          border-radius: 6px;
-          background: transparent;
           text-align: left;
         }
-        .playlist-row.active {
+        .playlist-row > button[data-action="select"] {
+          display: flex;
+          align-items: center;
+          width: 100%;
+          text-align: left;
+          background: transparent;
+          border: 1px solid transparent;
+        }
+        .playlist-row > button[data-action="select"]:hover {
+          background: var(--secondary-background-color);
+        }
+        .playlist-row.active > button[data-action="select"] {
+          background: color-mix(in srgb, var(--primary-color) 16%, var(--card-background-color));
+          box-shadow: inset 3px 0 var(--primary-color);
+        }
+        .playlist-row > button[data-action="play"] {
+          background: var(--card-background-color);
+          border: 1px solid var(--divider-color);
+        }
+        .playlist-row > button[data-action="play"]:hover {
           background: var(--secondary-background-color);
         }
         .playlist-row .name {
@@ -524,7 +551,7 @@ class PianoDiscPlaylistCard extends HTMLElement {
           border: 1px dashed var(--divider-color);
           border-radius: 6px;
         }
-        @media (max-width: 920px) {
+        @container (max-width: 900px) {
           .page { padding: 12px; }
           header { align-items: stretch; flex-direction: column; }
           .layout { grid-template-columns: 1fr; }
