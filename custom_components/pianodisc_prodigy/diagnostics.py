@@ -40,6 +40,11 @@ async def async_get_config_entry_diagnostics(
             "switch": coordinator.power_switch,
             "on": coordinator.power_on,
         },
+        "msc": {
+            "channels": coordinator.msc_channel_states,
+            "last": coordinator.last_msc,
+            "channel_count": coordinator.msc_channel_count,
+        },
         "data": async_redact_data(asdict(coordinator.data), TO_REDACT),
         "piano_debug": (
             async_redact_data(piano_debug, PIANO_DEBUG_TO_REDACT)

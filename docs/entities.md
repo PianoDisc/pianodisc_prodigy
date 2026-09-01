@@ -52,7 +52,7 @@ Unavailable when the piano hasn't reported any playlists — either because it's
 because there are none yet. Create playlists from the **Piano Playlists** sidebar panel;
 see [SD card, MIDI files and playlists](sd-card.md).
 
-## Keys active (binary sensor)
+## Piano active (binary sensor)
 
 On while the player system is playing — that is, while the piano is driving its own keys.
 
@@ -73,6 +73,17 @@ between songs don't make it flicker.
 It turns on for anything that drives the keys, including music played from the iQ App —
 though in that case Home Assistant knows only that the keys are moving, not what's
 playing. See [the piano is playing but Home Assistant shows no song](troubleshooting.md#the-piano-is-playing-but-home-assistant-shows-no-song).
+
+## Show Control (sub-device)
+
+When MQTT is available, the piano can turn MIDI Show Control cues embedded in a MIDI file
+into Home Assistant automation triggers. Cue number N is channel N: `GO 001` turns on
+**MSC channel 1**, `STOP 001` turns it off, and `FIRE 001` triggers **MSC channel 1 fire**.
+
+Choose the number of channels in the integration's **Options** (`msc_channels`, default
+8; 0 removes these entities). Channel states turn off a few seconds after a song ends or
+the piano goes offline; pausing does not reset them. They are not restored after a Home
+Assistant restart. Without MQTT, channel binary sensors show unknown.
 
 ## Library (sensor)
 

@@ -13,7 +13,7 @@ rules:
   appropriate-polling: done
   entity-unique-id: done
   has-entity-name: done
-  entity-event-setup: todo
+  entity-event-setup: done
   dependency-transparency: done
   action-setup:
     status: todo
@@ -47,14 +47,14 @@ rules:
   discovery: done  # mqtt + dhcp matchers
   stale-devices:
     status: exempt
-    comment: One device per config entry; nothing to prune.
+    comment: Each entry has the piano plus an optional Show Control sub-device, removed when channels are disabled.
   diagnostics: done
   exception-translations: todo
   icon-translations: todo
   reconfiguration-flow: todo
   dynamic-devices:
     status: exempt
-    comment: One device per config entry.
+    comment: Each entry has two fixed devices at most; Show Control is option-driven, not discovered dynamically.
   discovery-update-info: done  # dhcp registered_devices keeps the IP current
   repair-issues: todo  # power_on_timeout issue added; revisit for full coverage
   docs-use-cases: todo

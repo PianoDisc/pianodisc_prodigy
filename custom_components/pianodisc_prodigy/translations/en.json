@@ -36,13 +36,15 @@
   "options": {
     "step": {
       "init": {
-        "title": "Power outlet",
-        "description": "Link the outlet or controller that powers this piano so Home Assistant can turn it on and off and show its power state. Only link an outlet dedicated to the piano — Home Assistant cuts its power when you turn the piano off. Leave empty to disable power control.",
+        "title": "Options",
+        "description": "Link the outlet or controller that powers this piano so Home Assistant can turn it on and off. Only link an outlet dedicated to the piano. Leave it empty to disable power control.",
         "data": {
-          "power_switch": "Power outlet"
+          "power_switch": "Power outlet",
+          "msc_channels": "Show control channels"
         },
         "data_description": {
-          "power_switch": "A switch, smart plug, outlet, or input boolean that controls power to the piano."
+          "power_switch": "A switch, smart plug, outlet, or input boolean that controls power to the piano.",
+          "msc_channels": "Number of MIDI Show Control channels. Set to 0 to remove channel entities; higher cues still reach the pianodisc_prodigy_msc event."
         }
       }
     }
@@ -69,7 +71,8 @@
   },
   "entity": {
     "binary_sensor": {
-      "busy": { "name": "Piano active" }
+      "busy": { "name": "Piano active" },
+      "msc_channel": { "name": "MSC channel {channel}" }
     },
     "sensor": {
       "library": {
@@ -96,6 +99,9 @@
     "update": {
       "audio_firmware": { "name": "Audio firmware" },
       "midi_firmware": { "name": "MIDI firmware" }
+    },
+    "event": {
+      "msc_fire": { "name": "MSC channel {channel} fire" }
     }
   },
   "exceptions": {

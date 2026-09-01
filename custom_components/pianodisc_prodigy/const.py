@@ -22,6 +22,9 @@ MODEL: Final = "Prodigy II"
 CONF_DEVICE_ID: Final = "device_id"
 # optional dedicated-outlet link (off by default)
 CONF_POWER_SWITCH: Final = "power_switch"
+CONF_MSC_CHANNELS: Final = "msc_channels"
+DEFAULT_MSC_CHANNELS: Final = 8
+MAX_MSC_CHANNELS: Final = 32
 
 # Transport selection -------------------------------------------------------
 TRANSPORT_MQTT: Final = "mqtt"
@@ -133,6 +136,13 @@ BUSY_DEBOUNCE: Final = 10.0  # seconds
 # keep striking the command was missed (stay PLAYING so the user can retry), else IDLE.
 STOP_CONFIRM: Final = 5.0  # seconds
 
+# A stop/end snapshot can briefly resemble an inter-song gap. A new PLAYING snapshot
+# cancels this delayed wipe, and a newer MSC cue survives a stale timer by sequence.
+MSC_RESET_CONFIRM: Final = 5.0  # seconds
+
+# Home Assistant event emitted for every valid MSC message, including out-of-range cues.
+EVENT_MSC: Final = f"{DOMAIN}_msc"
+
 # After a (re)play the device keeps reporting the previous /playerStatus.song for a
 # moment, so suppress the stale title until a new one appears — bounded so replaying the
 # same song isn't hidden forever.
@@ -143,12 +153,8 @@ SONG_UNKNOWN_GRACE: Final = 30.0  # seconds
 SHUFFLE_HOLD_GRACE: Final = 60.0  # seconds
 
 # Firmware version policy (decision #3). Floors/recommended.
-# These are the first builds carrying the Home Assistant support this integration needs,
-# so the floor and the recommended version are the same: earlier releases are versions of
-# firmware that predate the feature, not older-but-workable ones. FW_*_RECOMMENDED is
-# published as the update entity's latest_version whenever the device is not reporting its
-# own backend check, so it must stay in step with the requirement stated in README.md.
-FW_AUDIO_FLOOR: Final = "0.5.0"
-FW_AUDIO_RECOMMENDED: Final = "0.5.0"
-FW_MIDI_FLOOR: Final = "1.4.0"
-FW_MIDI_RECOMMENDED: Final = "1.4.0"
+# TODO: confirm the exact compat range with the audio-engine team.
+FW_AUDIO_FLOOR: Final = "0.4.5"
+FW_AUDIO_RECOMMENDED: Final = "0.4.7"
+FW_MIDI_FLOOR: Final = "1.0.5"
+FW_MIDI_RECOMMENDED: Final = "1.3.5"

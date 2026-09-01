@@ -29,6 +29,10 @@ _DEMO_SONG_PATHS: list[str] = [f"/sd/{song}.mid" for song in _DEMO_SONGS]
 class FakeTransport(Transport):
     """A deterministic, in-memory piano."""
 
+    @property
+    def supports_msc(self) -> bool:
+        return True
+
     def __init__(self, device_name: str = "Demo Prodigy") -> None:
         super().__init__()
         self.reboot_count = 0
@@ -96,6 +100,10 @@ class FakeTransport(Transport):
     def _update(self, **changes: object) -> None:
         self._data = self._data.merge(**changes)
         self._emit(self._data)
+
+    def simulate_msc(self, command: object, cue: object) -> None:
+        """Deliver one normalized MSC cue to the coordinator in tests."""
+        self._emit_msc(str(command).strip().upper(), str(cue))
 
     # -- transport commands -------------------------------------------------
     async def async_play(self, index: int | None = None) -> None:

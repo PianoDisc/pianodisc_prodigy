@@ -30,6 +30,7 @@ class PianoDiscEntity(CoordinatorEntity[PianoDiscCoordinator]):
         # The deviceID is MAC-derived; when it is a bare 12-hex MAC we publish a
         # CONNECTION_NETWORK_MAC so HA can merge this device with the same unit's
         # squeezelite/LMS streaming player into one device card.
+        # TODO(build): verify deviceID == squeezelite player MAC on DEFAEE5C894F.
         connections: set[tuple[str, str]] = set()
         if _MAC12.match(device_id):
             connections = {(CONNECTION_NETWORK_MAC, format_mac(device_id))}
@@ -66,3 +67,19 @@ class PianoDiscEntity(CoordinatorEntity[PianoDiscCoordinator]):
     @property
     def available(self) -> bool:
         return super().available and self.coordinator.data.available
+
+
+class PianoDiscShowControlEntity(PianoDiscEntity):
+    """Entity on the piano's Show Control sub-device."""
+
+    def __init__(self, coordinator: PianoDiscCoordinator) -> None:
+        super().__init__(coordinator)
+        entry = coordinator.config_entry
+        device_id = entry.unique_id or entry.data[CONF_DEVICE_ID]
+        piano_name = coordinator.data.device_name or entry.title
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{device_id}_show_control")},
+            via_device=(DOMAIN, device_id),
+            manufacturer=MANUFACTURER,
+            name=f"{piano_name} Show Control",
+        )

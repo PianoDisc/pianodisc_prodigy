@@ -22,9 +22,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr
 from homeassistant.setup import async_setup_component
 
-from .const import CONF_DEVICE_ID, DOMAIN, LOGGER
+from .const import CONF_DEVICE_ID, DOMAIN, LOGGER, MANUFACTURER, MAX_MSC_CHANNELS, MODEL
 from .coordinator import PianoDiscConfigEntry, PianoDiscCoordinator
 from .transports import Transport
 from .transports.http import HttpTransport
@@ -39,6 +40,7 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
     Platform.SWITCH,
     Platform.UPDATE,
+    Platform.EVENT,
 ]
 
 
@@ -53,6 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) ->
 
     _remove_legacy_shuffle_entity(hass, entry)
     _remove_legacy_power_proxy_entity(hass, entry)
+    _async_sync_msc_registry(hass, entry, coordinator)
 
     entry.runtime_data = coordinator
     # An options change (linking/unlinking the power outlet) reloads the entry so the
@@ -167,6 +170,45 @@ def _remove_legacy_power_proxy_entity(
     entity_id = registry.async_get_entity_id("switch", DOMAIN, f"{device_id}_power")
     if entity_id is not None:
         registry.async_remove(entity_id)
+
+
+def _async_sync_msc_registry(
+    hass: HomeAssistant, entry: PianoDiscConfigEntry, coordinator: PianoDiscCoordinator
+) -> None:
+    """Prune resized MSC entities and create the Show Control device hierarchy."""
+    device_id = entry.unique_id or entry.data[CONF_DEVICE_ID]
+    entity_registry = er.async_get(hass)
+    for channel in range(coordinator.msc_channel_count + 1, MAX_MSC_CHANNELS + 1):
+        for domain, unique_id in (
+            ("binary_sensor", f"{device_id}_msc_ch{channel}"),
+            ("event", f"{device_id}_msc_fire_ch{channel}"),
+        ):
+            entity_id = entity_registry.async_get_entity_id(domain, DOMAIN, unique_id)
+            if entity_id is not None:
+                entity_registry.async_remove(entity_id)
+
+    device_registry = dr.async_get(hass)
+    show_control_id = f"{device_id}_show_control"
+    if coordinator.msc_channel_count == 0:
+        device = device_registry.async_get_device(identifiers={(DOMAIN, show_control_id)})
+        if device is not None:
+            device_registry.async_remove_device(device.id)
+        return
+
+    piano = device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, device_id)},
+        manufacturer=MANUFACTURER,
+        model=MODEL,
+        name=coordinator.data.device_name or entry.title,
+    )
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, show_control_id)},
+        via_device=(DOMAIN, device_id),
+        manufacturer=MANUFACTURER,
+        name=f"{piano.name or entry.title} Show Control",
+    )
 
 
 async def _async_reload_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> None:

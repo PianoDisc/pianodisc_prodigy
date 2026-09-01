@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Adds MIDI Show Control (MSC) channels and FIRE events for MIDI files authored with
+  the PianoDisc MSC Cue Editor.
+
 ## v0.1.3 - 2026-08-27
 
 - Adds startup readiness and initial library-sync states, so controls wait until the

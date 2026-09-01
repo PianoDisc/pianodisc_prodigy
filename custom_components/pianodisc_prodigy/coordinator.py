@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 
 from homeassistant.components import persistent_notification
 from homeassistant.components.media_player import MediaPlayerState
@@ -24,17 +24,23 @@ from homeassistant.core import (
     callback,
 )
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_POWER_SWITCH,
     CONF_DEVICE_ID,
+    CONF_MSC_CHANNELS,
+    DEFAULT_MSC_CHANNELS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    EVENT_MSC,
     LOGGER,
     POWER_OFF_SETTLE,
     POWER_ON_TIMEOUT,
+    MSC_RESET_CONFIRM,
     SCAN_INTERVAL_DISCONNECTED,
     SCAN_INTERVAL_IDLE,
     SCAN_INTERVAL_PLAYING,
@@ -48,6 +54,11 @@ type PianoDiscConfigEntry = ConfigEntry[PianoDiscCoordinator]
 # The generic turn_on/off service dispatches to the linked entity's own domain
 # (switch / input_boolean / light), so one call covers every supported power entity.
 _HA_DOMAIN = "homeassistant"
+
+
+def msc_fire_signal(entry_id: str, channel: int) -> str:
+    """Return the dispatcher signal for one entry's MSC FIRE channel."""
+    return f"{DOMAIN}_{entry_id}_msc_fire_{channel}"
 
 
 def _format_device_sw_version(data: ProdigyData) -> str | None:
@@ -131,6 +142,15 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         # can never wedge, and overridden the moment the piano reports. See
         # [[power-architecture]].
         self._powering_on_until = 0.0
+        self.msc_channel_count = int(
+            entry.options.get(CONF_MSC_CHANNELS, DEFAULT_MSC_CHANNELS)
+        )
+        self.msc_channel_states: dict[int, bool] = {}
+        self.last_msc: dict[str, object] | None = None
+        self._msc_seq = 0
+        self._msc_reset_cancel: Callable[[], None] | None = None
+        self._msc_reset_seq = 0
+        self.transport.set_msc_listener(self.handle_msc)
 
     @property
     def power_linked(self) -> bool:
@@ -175,17 +195,21 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
     async def _async_update_data(self) -> ProdigyData:
         # Powered down through the linked outlet → don't poll a host that can't answer.
         if self.power_switch is not None and self.power_on is False:
-            return (self.data or ProdigyData()).merge(available=False)
+            data = (self.data or ProdigyData()).merge(available=False)
+            self._observe_msc_reset(self.data, data)
+            return data
         try:
             data = await self.transport.async_fetch_snapshot()
         except Exception as err:  # transports raise heterogeneous errors
             raise UpdateFailed(f"Error polling piano: {err}") from err
         self._retune_interval(data)
+        self._observe_msc_reset(self.data, data)
         return data
 
     @callback
     def _handle_push(self, data: ProdigyData) -> None:
         """Apply an out-of-band update from a push transport."""
+        previous_data = self.data
         previous_readiness = self.data.readiness if self.data is not None else "unknown"
         became_ready = data.readiness in {"READY", "OK"} and previous_readiness not in {
             "READY",
@@ -197,9 +221,93 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
 
         self._retune_interval(data)
         self.async_set_updated_data(data)
+        self._observe_msc_reset(previous_data, data)
         self._update_device_registry(data)
         if became_ready:
             self._schedule_library_prefetch()
+
+    @callback
+    def handle_msc(self, command: str, cue: str) -> None:
+        """Apply one live MSC message and always publish its catch-all event."""
+        self._msc_seq += 1
+        self.last_msc = {
+            "command": command,
+            "cue": cue,
+            "received_at": dt_util.utcnow().isoformat(),
+        }
+        channel = None
+        if cue.isdigit():
+            parsed = int(cue)
+            if 1 <= parsed <= self.msc_channel_count:
+                channel = parsed
+        handled = channel is not None and command in {"GO", "STOP", "FIRE"}
+        if command in {"GO", "STOP"} and channel is not None:
+            self.msc_channel_states[channel] = command == "GO"
+            self.async_update_listeners()
+        elif command == "FIRE" and channel is not None:
+            async_dispatcher_send(
+                self.hass,
+                msc_fire_signal(self.config_entry.entry_id, channel),
+                cue,
+            )
+        device_id = self.config_entry.unique_id or self.config_entry.data[CONF_DEVICE_ID]
+        self.hass.bus.async_fire(
+            EVENT_MSC,
+            {
+                "device_id": device_id,
+                "entry_id": self.config_entry.entry_id,
+                "command": command,
+                "cue": cue,
+                "channel": channel,
+                "handled": handled,
+            },
+        )
+
+    def _cancel_msc_reset(self) -> None:
+        if self._msc_reset_cancel is not None:
+            self._msc_reset_cancel()
+            self._msc_reset_cancel = None
+
+    def _reset_msc_now(self) -> None:
+        self._cancel_msc_reset()
+        if any(self.msc_channel_states.values()):
+            self.msc_channel_states.clear()
+            self.async_update_listeners()
+        else:
+            self.msc_channel_states.clear()
+
+    @callback
+    def _msc_reset_fired(self, _now: object) -> None:
+        self._msc_reset_cancel = None
+        if self._msc_seq == self._msc_reset_seq:
+            self._reset_msc_now()
+
+    @callback
+    def _observe_msc_reset(self, prev: ProdigyData | None, new: ProdigyData) -> None:
+        """Reset on confirmed end/offline, never on a pause or inter-song gap.
+
+        MQTT hides normal stop/end as a non-playing snapshot with no song. During a
+        next-track/autoplay gap the same shape may occur briefly, so PLAYING cancels a
+        pending wipe and the delayed callback is ordered against MSC messages.
+        """
+        if not new.available:
+            self._reset_msc_now()
+            return
+        if new.state is MediaPlayerState.PLAYING:
+            self._cancel_msc_reset()
+            return
+        if prev is None or self._msc_reset_cancel is not None:
+            return
+        was_active = (
+            prev.song is not None
+            or prev.song_path is not None
+            or prev.state is MediaPlayerState.PLAYING
+        )
+        if was_active and new.song is None and new.song_path is None:
+            self._msc_reset_seq = self._msc_seq
+            self._msc_reset_cancel = async_call_later(
+                self.hass, MSC_RESET_CONFIRM, self._msc_reset_fired
+            )
 
     @callback
     def _update_device_registry(self, data: ProdigyData) -> None:
@@ -483,6 +591,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
             self.hass.async_create_task(self.async_refresh())
         else:
             self._powering_on_until = 0.0
+            self._reset_msc_now()
             self.async_update_listeners()
 
     def _blank_snapshot(self) -> ProdigyData:
@@ -509,6 +618,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
             self.hass.async_create_task(self.async_refresh())
         else:
             self._powering_on_until = 0.0
+            self._reset_msc_now()
             self.async_update_listeners()
 
     async def async_set_outlet_power(self, on: bool) -> None:
@@ -550,5 +660,6 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         await self.async_set_outlet_power(False)
 
     async def async_shutdown(self) -> None:
+        self._cancel_msc_reset()
         await super().async_shutdown()
         await self.transport.async_close()

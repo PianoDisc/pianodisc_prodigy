@@ -41,6 +41,7 @@ from ..const import (
     MQTT_TOPIC_LIBRARY_PAGE,
     MQTT_TOPIC_LIBRARY_REQUEST,
     MQTT_TOPIC_NETWORK,
+    MQTT_TOPIC_MSC,
     MQTT_TOPIC_PLAYER_STATUS,
     MQTT_TOPIC_PLAYLIST_REQUEST,
     MQTT_TOPIC_PLAYLIST_STATE,
@@ -127,6 +128,10 @@ class MqttTransport(Transport):
     def uses_push_updates(self) -> bool:
         return True
 
+    @property
+    def supports_msc(self) -> bool:
+        return True
+
     def __init__(
         self,
         hass: HomeAssistant,
@@ -183,6 +188,7 @@ class MqttTransport(Transport):
             MQTT_TOPIC_READY: self._on_ready,
             MQTT_TOPIC_DEVICE_NAME: self._on_device_name,
             MQTT_TOPIC_NETWORK: self._on_network,
+            MQTT_TOPIC_MSC: self._on_msc,
             MQTT_TOPIC_VERSION: self._on_version,
             MQTT_TOPIC_UPDATE: self._on_update,
             MQTT_TOPIC_LIBRARY_PAGE: self._on_library_page,
@@ -214,13 +220,35 @@ class MqttTransport(Transport):
             if cancel is not None:
                 cancel()
         self._cancel_watchdog = self._cancel_busy = None
-        for waiters in (self._library_waiters, self._playlist_waiters, self._autoplay_waiters):
+        for waiters in (
+            self._library_waiters,
+            self._playlist_waiters,
+            self._autoplay_waiters,
+        ):
             for fut in waiters.values():
                 if not fut.done():
                     fut.cancel()
             waiters.clear()
 
     # -- status overlay (MQTT push) ----------------------------------------
+    @callback
+    def _on_msc(self, msg: ReceiveMessage) -> None:
+        """Forward a live MIDI Show Control message without affecting snapshots."""
+        if msg.retain:
+            return
+        try:
+            payload = _json_payload(msg.payload)
+            if not isinstance(payload, dict):
+                raise ValueError("payload is not an object")
+            command = str(payload["command"]).strip().upper()
+            cue = str(payload["cue"]).strip()
+            if not command or not cue:
+                raise ValueError("empty command or cue")
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as err:
+            LOGGER.debug("Ignoring malformed MSC message: %s", err)
+            return
+        self._emit_msc(command, cue)
+
     @callback
     def _avail(self, msg: ReceiveMessage) -> bool:
         # CR#6: these status topics are now published retained, so the broker replays
@@ -1106,7 +1134,9 @@ class MqttTransport(Transport):
         self._push(source_list=names)
 
     async def async_fetch_autoplay_config(self) -> dict[str, object]:
-        payload = await self._request_response(self._autoplay_request_topic, self._autoplay_waiters, {"op": "get"})
+        payload = await self._request_response(
+            self._autoplay_request_topic, self._autoplay_waiters, {"op": "get"}
+        )
         config = payload.get("config") if isinstance(payload, dict) else None
         if isinstance(config, dict):
             return dict(config)
@@ -1115,6 +1145,10 @@ class MqttTransport(Transport):
         return {}
 
     async def async_save_autoplay_config(self, config: dict[str, object]) -> None:
-        payload = await self._request_response(self._autoplay_request_topic, self._autoplay_waiters, {"op": "set", "config": config})
+        payload = await self._request_response(
+            self._autoplay_request_topic,
+            self._autoplay_waiters,
+            {"op": "set", "config": config},
+        )
         if payload is None and self._http is not None:
             await self._http.async_save_autoplay_config(config)

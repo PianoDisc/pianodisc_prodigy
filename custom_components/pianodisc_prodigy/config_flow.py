@@ -12,8 +12,8 @@ never gets added twice:
 MQTT-discovered path has no IP, so the HTTP half (firmware, library, cold-start seed)
 cannot compose until one is supplied.
 
-The options flow links an optional dedicated power outlet so HA can turn the piano on
-and off and show its power state (see power-control design).
+The options flow links an optional dedicated power outlet and configures MIDI Show
+Control channel entities.
 """
 
 from __future__ import annotations
@@ -37,10 +37,13 @@ import voluptuous as vol
 
 from .const import (
     CONF_DEVICE_ID,
+    CONF_MSC_CHANNELS,
     CONF_POWER_SWITCH,
+    DEFAULT_MSC_CHANNELS,
     DOMAIN,
     MANUFACTURER,
     MODEL,
+    MAX_MSC_CHANNELS,
     MQTT_PAYLOAD_ONLINE,
     MQTT_TOPIC_ROOT,
 )
@@ -60,7 +63,7 @@ _POWER_SWITCH_DOMAINS = ["switch", "input_boolean", "light"]
 
 def _default_name(device_id: str) -> str:
     """A human default name. The per-unit ``device_name`` is the generic "Prodigy2",
-    so we suffix the deviceID tail (e.g. "PianoDisc Prodigy II ABCDEF")."""
+    so we suffix the deviceID tail (e.g. "PianoDisc Prodigy II 5C894F")."""
     return f"{MANUFACTURER} {MODEL} {device_id[-6:]}"
 
 
@@ -77,7 +80,7 @@ class PianoDiscConfigFlow(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> PianoDiscOptionsFlow:
-        """Return the options flow (link a power outlet)."""
+        """Return the options flow (power outlet and show-control channels)."""
         return PianoDiscOptionsFlow()
 
     # -- manual ------------------------------------------------------------
@@ -128,17 +131,12 @@ class PianoDiscConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_dhcp(
         self, discovery_info: DhcpServiceInfo
     ) -> ConfigFlowResult:
-        fallback_device_id = format_mac(discovery_info.macaddress).replace(":", "").upper()
-        try:
-            device_id, default_name = await self._async_probe(discovery_info.ip)
-        except CannotConnect:
-            device_id = fallback_device_id
-            default_name = _default_name(device_id)
+        device_id = format_mac(discovery_info.macaddress).replace(":", "").upper()
         await self.async_set_unique_id(device_id)
         self._abort_if_unique_id_configured(updates={CONF_HOST: discovery_info.ip})
         self._host = discovery_info.ip
         self._device_id = device_id
-        self._name = discovery_info.hostname or default_name
+        self._name = discovery_info.hostname or _default_name(device_id)
         self.context["title_placeholders"] = {"name": self._name}
         return await self.async_step_discovery_confirm()
 
@@ -200,7 +198,7 @@ class PianoDiscConfigFlow(ConfigFlow, domain=DOMAIN):
         """Resolve ``(device_id, default_name)`` from a host over HTTP.
 
         ``GET /debugJson?type=request`` is the only HTTP source of the MAC-derived
-        deviceID and both firmware versions (see device captures). Never key on the
+        deviceID and both firmware versions (see [[golden-capture]]). Never key on the
         editable ``device_name`` — it is the generic "Prodigy2" on ``/status.json``.
         """
         transport = HttpTransport(async_get_clientsession(self.hass), host)
@@ -212,7 +210,7 @@ class PianoDiscConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class PianoDiscOptionsFlow(OptionsFlow):
-    """Link (or unlink) a dedicated power outlet for the piano.
+    """Configure a dedicated power outlet and MIDI Show Control channels.
 
     The selected entity becomes the piano's power authority: TURN_ON energizes it and
     waits for the piano to come online, TURN_OFF gracefully stops then de-energizes it,
@@ -223,12 +221,21 @@ class PianoDiscOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
-            # Drop empty values so clearing the field removes the link entirely.
+            # An empty outlet removes the link; zero MSC channels is a deliberate
+            # disable value and must survive instead of being filtered as falsy.
+            data: dict[str, Any] = {
+                CONF_MSC_CHANNELS: int(user_input[CONF_MSC_CHANNELS])
+            }
+            if user_input.get(CONF_POWER_SWITCH):
+                data[CONF_POWER_SWITCH] = user_input[CONF_POWER_SWITCH]
             return self.async_create_entry(
-                title="", data={k: v for k, v in user_input.items() if v}
+                title="", data=data
             )
 
         current = self.config_entry.options.get(CONF_POWER_SWITCH)
+        current_msc = int(
+            self.config_entry.options.get(CONF_MSC_CHANNELS, DEFAULT_MSC_CHANNELS)
+        )
         schema = vol.Schema(
             {
                 vol.Optional(
@@ -236,7 +243,15 @@ class PianoDiscOptionsFlow(OptionsFlow):
                     description={"suggested_value": current},
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain=_POWER_SWITCH_DOMAINS)
-                )
+                ),
+                vol.Required(CONF_MSC_CHANNELS, default=current_msc): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
+                        max=MAX_MSC_CHANNELS,
+                        step=1,
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)
