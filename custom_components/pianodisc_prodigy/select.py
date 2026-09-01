@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from homeassistant.components.select import SelectEntity
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -18,8 +19,14 @@ async def async_setup_entry(
     entry: PianoDiscConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the playlist selector."""
-    async_add_entities([PianoDiscPlaylistSelect(entry.runtime_data)])
+    """Set up quick playback and persisted AutoPlay configuration selects."""
+    async_add_entities(
+        [
+            PianoDiscPlaylistSelect(entry.runtime_data),
+            PianoDiscAutoPlayPlaylistSelect(entry.runtime_data),
+            PianoDiscAutoPlaySortSelect(entry.runtime_data),
+        ]
+    )
 
 
 class PianoDiscPlaylistSelect(PianoDiscEntity, SelectEntity):
@@ -85,3 +92,88 @@ class PianoDiscPlaylistSelect(PianoDiscEntity, SelectEntity):
             changes["source_list"] = list(source_list)
         if changes:
             self.coordinator.async_set_updated_data(data.merge(**changes))
+
+
+class _PianoDiscAutoPlaySelect(PianoDiscEntity, SelectEntity):
+    """Shared availability and startup fetch for AutoPlay configuration selects."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator: PianoDiscCoordinator, unique_suffix: str) -> None:
+        super().__init__(coordinator)
+        device_id = (
+            coordinator.config_entry.unique_id
+            or coordinator.config_entry.data[CONF_DEVICE_ID]
+        )
+        self._attr_unique_id = f"{device_id}_{unique_suffix}"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.hass.async_create_task(self.coordinator.async_fetch_autoplay_config())
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.coordinator.autoplay_config is not None
+
+
+class PianoDiscAutoPlayPlaylistSelect(_PianoDiscAutoPlaySelect):
+    """Choose the playlist that starts automatically after the piano boots."""
+
+    _attr_translation_key = "autoplay_playlist"
+    _attr_icon = "mdi:playlist-play"
+
+    def __init__(self, coordinator: PianoDiscCoordinator) -> None:
+        super().__init__(coordinator, "autoplay_playlist")
+
+    @property
+    def options(self) -> list[str]:
+        return [
+            item["name"]
+            for item in self.coordinator.playlist_definitions or []
+            if isinstance(item.get("name"), str)
+        ]
+
+    @property
+    def current_option(self) -> str | None:
+        config = self.coordinator.autoplay_config
+        if config is None:
+            return None
+        index = config.get("playlist")
+        return self.options[index] if isinstance(index, int) and index < len(self.options) else None
+
+    @property
+    def available(self) -> bool:
+        return super().available and bool(self.options)
+
+    async def async_select_option(self, option: str) -> None:
+        await self.coordinator.async_save_autoplay_config(
+            {"playlist": self.options.index(option)}
+        )
+
+
+class PianoDiscAutoPlaySortSelect(_PianoDiscAutoPlaySelect):
+    """Select AutoPlay's explicit playback order override."""
+
+    _attr_translation_key = "autoplay_sort"
+    _attr_icon = "mdi:sort"
+    _OPTIONS = ["Default", "Sequence", "Shuffle"]
+
+    def __init__(self, coordinator: PianoDiscCoordinator) -> None:
+        super().__init__(coordinator, "autoplay_sort")
+
+    @property
+    def options(self) -> list[str]:
+        return self._OPTIONS
+
+    @property
+    def current_option(self) -> str | None:
+        config = self.coordinator.autoplay_config
+        if config is None:
+            return None
+        sort = config.get("sort")
+        return self._OPTIONS[sort] if isinstance(sort, int) and sort < len(self._OPTIONS) else None
+
+    async def async_select_option(self, option: str) -> None:
+        await self.coordinator.async_save_autoplay_config(
+            {"sort": self._OPTIONS.index(option)}
+        )

@@ -1,4 +1,4 @@
-class PianoDiscPlaylistPanel extends HTMLElement {
+class PianoDiscPlaylistCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     if (!this._loaded) {
@@ -7,13 +7,27 @@ class PianoDiscPlaylistPanel extends HTMLElement {
     }
   }
 
-  set panel(config) {
-    this._panelConfig = config || {};
+  setConfig(config) {
+    this._config = config || {};
+    const entityId = this._config.entity;
+    if (entityId && entityId !== this._entityId) {
+      this._entityId = entityId;
+      if (this._loaded) this._load();
+    }
+  }
+
+  getCardSize() {
+    return 12;
+  }
+
+  static getStubConfig() {
+    return { type: "custom:pianodisc-playlist-card" };
   }
 
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
+    this._config = {};
     this._entities = [];
     this._entityId = null;
     this._playlists = [];
@@ -266,16 +280,12 @@ class PianoDiscPlaylistPanel extends HTMLElement {
       <style>
         :host {
           display: block;
-          min-height: 100vh;
           color: var(--primary-text-color);
-          background: var(--primary-background-color);
           box-sizing: border-box;
         }
         * { box-sizing: border-box; }
         .page {
-          max-width: 1180px;
-          margin: 0 auto;
-          padding: 24px;
+          padding: 16px;
         }
         header {
           display: flex;
@@ -375,9 +385,11 @@ class PianoDiscPlaylistPanel extends HTMLElement {
         .layout.loading-active {
           opacity: 0.72;
         }
-        ha-card {
+        .panel {
           display: block;
           overflow: hidden;
+          border: 1px solid var(--divider-color);
+          border-radius: 6px;
         }
         .card-title {
           display: flex;
@@ -524,6 +536,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
           .actions { justify-content: flex-end; }
         }
       </style>
+      <ha-card>
       <div class="page">
         <header>
           <h1>Piano Playlists</h1>
@@ -537,7 +550,7 @@ class PianoDiscPlaylistPanel extends HTMLElement {
         ${this._error ? `<div class="error">${this._escape(this._error)}</div>` : ""}
         ${this._loading ? `<div class="loading"><span class="spinner"></span><span>Loading playlists and SD-card songs from the piano...</span></div>` : !libraryReady ? `<div class="loading"><span class="spinner"></span><span>${startupMessage}</span></div>` : ""}
         ${libraryReady ? `<div class="layout ${this._loading ? "loading-active" : ""}">
-          <ha-card>
+          <section class="panel">
             <div class="card-title">
               <span>Playlists</span>
               <button class="icon" title="Add playlist" data-action="add-playlist" ${disabled}>
@@ -547,8 +560,8 @@ class PianoDiscPlaylistPanel extends HTMLElement {
             <div class="playlist-list">
               ${this._playlistListTemplate()}
             </div>
-          </ha-card>
-          <ha-card>
+          </section>
+          <section class="panel">
             ${
               playlist
                 ? this._editorTemplate(playlist)
@@ -556,15 +569,16 @@ class PianoDiscPlaylistPanel extends HTMLElement {
                   ? `<div class="empty">Loading playlist data...</div>`
                   : `<div class="empty">Create a playlist to begin.</div>`
             }
-          </ha-card>
+          </section>
         </div>` : ""}
       </div>
+      </ha-card>
     `;
     this._bindEvents();
   }
 
   _entitySelectTemplate() {
-    if (this._entities.length <= 1) return "";
+    if (this._config.entity || this._entities.length <= 1) return "";
     return `
       <select data-action="entity" ${this._loading || this._saving ? "disabled" : ""}>
         ${this._entities
@@ -814,4 +828,10 @@ class PianoDiscPlaylistPanel extends HTMLElement {
   }
 }
 
-customElements.define("pianodisc-playlist-panel", PianoDiscPlaylistPanel);
+customElements.define("pianodisc-playlist-card", PianoDiscPlaylistCard);
+window.customCards = window.customCards || [];
+window.customCards.push({
+  type: "pianodisc-playlist-card",
+  name: "PianoDisc Playlists",
+  description: "Edit playlists for a PianoDisc Prodigy II piano.",
+});

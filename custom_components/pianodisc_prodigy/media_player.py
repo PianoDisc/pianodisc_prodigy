@@ -103,6 +103,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
     """Represents the piano's SD-card MIDI playback (the player-piano transport)."""
 
     _attr_name = None  # primary entity → shows as the device/room name
+    _attr_has_entity_name = False
     _attr_icon = "mdi:piano"  # the one icon we own (the browse button's icon is HA's)
 
     def __init__(self, coordinator: PianoDiscCoordinator) -> None:
@@ -111,6 +112,18 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
             coordinator.config_entry.unique_id
             or coordinator.config_entry.data[CONF_DEVICE_ID]
         )
+
+    @property
+    def name(self) -> str | None:
+        """Use the current song in HA's compact device Controls row.
+
+        The native row renders the entity name and state, but ignores
+        ``media_title``. Keep the normal device name until a real song title exists.
+        """
+        data = self.coordinator.data
+        if data.state in _PLAYING_STATES and data.song:
+            return data.song
+        return data.device_name or self.coordinator.config_entry.title
 
     @property
     def supported_features(self) -> MediaPlayerEntityFeature:

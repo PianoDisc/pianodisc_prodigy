@@ -18,9 +18,6 @@ from .transports.http import title_from_path
 
 _WS_DATA = f"{DOMAIN}/playlist_data"
 _WS_SAVE = f"{DOMAIN}/save_playlists"
-_WS_AUTOPLAY_DATA = f"{DOMAIN}/autoplay_data"
-_WS_SAVE_AUTOPLAY = f"{DOMAIN}/save_autoplay"
-_WS_LIBRARY_DATA = f"{DOMAIN}/library_data"
 
 
 def _library_ui_status(coordinator: PianoDiscCoordinator) -> str:
@@ -37,9 +34,6 @@ def async_register_websocket_api(hass: HomeAssistant) -> None:
     """Register playlist editor websocket commands."""
     websocket_api.async_register_command(hass, websocket_playlist_data)
     websocket_api.async_register_command(hass, websocket_save_playlists)
-    websocket_api.async_register_command(hass, websocket_autoplay_data)
-    websocket_api.async_register_command(hass, websocket_save_autoplay)
-    websocket_api.async_register_command(hass, websocket_library_data)
 
 
 @websocket_api.websocket_command(
@@ -65,7 +59,16 @@ async def websocket_playlist_data(
     coordinator, entity_id = selected
     library_status = _library_ui_status(coordinator)
     if library_status != "ready":
-        connection.send_result(msg["id"], {"entity_id": entity_id, "entities": _media_player_entities(hass), "library_status": library_status, "playlists": [], "songs": []})
+        connection.send_result(
+            msg["id"],
+            {
+                "entity_id": entity_id,
+                "entities": _media_player_entities(hass),
+                "library_status": library_status,
+                "playlists": [],
+                "songs": [],
+            },
+        )
         return
     try:
         if msg["refresh"]:
@@ -122,54 +125,6 @@ async def websocket_save_playlists(
         return
     await coordinator.async_request_refresh()
     connection.send_result(msg["id"], {"playlists": playlists})
-
-
-@websocket_api.websocket_command({vol.Required("type"): _WS_AUTOPLAY_DATA, vol.Optional("entity_id"): cv.entity_id, vol.Optional("refresh", default=False): cv.boolean})
-@websocket_api.async_response
-async def websocket_autoplay_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
-    """Return AutoPlay configuration with the shared playlist cache."""
-    try:
-        coordinator, entity_id = _coordinator_from_msg(hass, msg)
-        playlists = await coordinator.async_fetch_playlists(force=msg["refresh"])
-        config = await coordinator.transport.async_fetch_autoplay_config()
-    except Exception as err:
-        connection.send_error(msg["id"], "autoplay_load_failed", str(err))
-        return
-    connection.send_result(msg["id"], {"entity_id": entity_id, "entities": _media_player_entities(hass), "playlists": playlists, "config": config})
-
-
-@websocket_api.websocket_command({vol.Required("type"): _WS_LIBRARY_DATA, vol.Optional("entity_id"): cv.entity_id, vol.Optional("refresh", default=False): cv.boolean})
-@websocket_api.async_response
-async def websocket_library_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
-    """Return the cached library for the searchable library panel."""
-    try:
-        coordinator, entity_id = _coordinator_from_msg(hass, msg)
-        library_status = _library_ui_status(coordinator)
-        if library_status != "ready":
-            connection.send_result(msg["id"], {"entity_id": entity_id, "entities": _media_player_entities(hass), "library_status": library_status, "songs": []})
-            return
-        if msg["refresh"]:
-            await coordinator.async_refresh_library()
-        paths = await coordinator.transport.async_fetch_song_paths()
-    except Exception as err:
-        connection.send_error(msg["id"], "library_load_failed", str(err))
-        return
-    connection.send_result(msg["id"], {"entity_id": entity_id, "entities": _media_player_entities(hass), "library_status": "ready", "songs": [{"title": title_from_path(path), "path": path} for path in paths]})
-
-
-@websocket_api.websocket_command({vol.Required("type"): _WS_SAVE_AUTOPLAY, vol.Required("entity_id"): cv.entity_id, vol.Required("config"): dict})
-@websocket_api.require_admin
-@websocket_api.async_response
-async def websocket_save_autoplay(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
-    """Validate and persist the one AutoPlay configuration object."""
-    try:
-        coordinator, _entity_id = _coordinator_from_msg(hass, msg)
-        config = _normalize_autoplay(msg["config"])
-        await coordinator.transport.async_save_autoplay_config(config)
-    except Exception as err:
-        connection.send_error(msg["id"], "autoplay_save_failed", str(err))
-        return
-    connection.send_result(msg["id"], {"config": config})
 
 
 def _coordinator_from_msg(
@@ -230,12 +185,3 @@ def _normalize_playlist(playlist: dict[str, Any]) -> dict[str, Any]:
     item.setdefault("sort", "Shuffle")
     item.setdefault("repeat", 1)
     return item
-
-
-def _normalize_autoplay(config: dict[str, Any]) -> dict[str, object]:
-    playlist, sort = config.get("playlist"), config.get("sort", 0)
-    if not isinstance(playlist, int) or playlist < 0:
-        raise ValueError("Choose an AutoPlay playlist")
-    if not isinstance(sort, int) or sort not in {0, 1, 2}:
-        raise ValueError("Invalid AutoPlay playback order")
-    return {"enable": bool(config.get("enable", False)), "playlist": playlist, "loop": bool(config.get("loop", False)), "sort": sort}
