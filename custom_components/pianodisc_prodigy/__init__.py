@@ -11,6 +11,12 @@ from homeassistant.components.frontend import (
     add_extra_js_url,
     async_remove_panel,
 )
+from homeassistant.components.lovelace.const import (
+    CONF_RESOURCE_TYPE_WS,
+    LOVELACE_DATA,
+    MODE_STORAGE,
+)
+from homeassistant.components.lovelace.resources import ResourceStorageCollection
 from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
@@ -95,8 +101,32 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
     # ``frontend`` normally creates this set during setup. Keep registration safe for
     # minimal/headless HA installations too, where the visual frontend is unavailable.
     hass.data.setdefault(DATA_EXTRA_MODULE_URL, set())
-    add_extra_js_url(hass, f"/{DOMAIN}/playlist-panel.js")
+    module_url = f"/{DOMAIN}/playlist-panel.js"
+    add_extra_js_url(hass, module_url)
+    await _async_register_lovelace_resource(hass, module_url)
     data["frontend_registered"] = True
+
+
+async def _async_register_lovelace_resource(hass: HomeAssistant, module_url: str) -> None:
+    """Make the card module a first-class Lovelace resource when storage mode is used.
+
+    ``add_extra_js_url`` helps on a full browser reload, but a storage-mode Lovelace
+    resource additionally notifies already-open dashboards to load the module.
+    """
+    lovelace_data = hass.data.get(LOVELACE_DATA)
+    if lovelace_data is None or lovelace_data.resource_mode != MODE_STORAGE:
+        return
+    resources = lovelace_data.resources
+    if not isinstance(resources, ResourceStorageCollection):
+        return
+    if not resources.loaded:
+        await resources.async_load()
+        resources.loaded = True
+    if any(item.get("url") == module_url for item in resources.async_items()):
+        return
+    await resources.async_create_item(
+        {"url": module_url, CONF_RESOURCE_TYPE_WS: "module"}
+    )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> bool:
