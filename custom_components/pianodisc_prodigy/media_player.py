@@ -373,7 +373,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
             title="Piano library",
             media_class=MediaClass.DIRECTORY,
             media_content_type=_BROWSE_ROOT,
-            media_content_id=_BROWSE_SONGS,
+            media_content_id=_BROWSE_ROOT,
             can_play=False,
             can_expand=True,
             children=[
