@@ -37,13 +37,7 @@ class PianoDiscLibraryCard extends HTMLElement {
   }
 
   get _entityId() {
-    return this._config.entity || this._findPlayer();
-  }
-
-  _findPlayer() {
-    return Object.keys(this._hass?.states || {}).find((entityId) =>
-      entityId.startsWith("media_player.")
-    );
+    return this._config.entity;
   }
 
   async _load() {
@@ -156,4 +150,4 @@ class PianoDiscLibraryCardEditor extends HTMLElement {
 customElements.define("pianodisc-library-card", PianoDiscLibraryCard);
 customElements.define("pianodisc-library-card-editor", PianoDiscLibraryCardEditor);
 window.customCards = window.customCards || [];
-window.customCards.push({ type: "pianodisc-library-card", name: "PianoDisc Library", description: "Search and play the cached PianoDisc music library." });
+window.customCards.push({ type: "pianodisc-library-card", name: "PianoDisc Library", description: "Search and play the cached PianoDisc music library.", preview: false });

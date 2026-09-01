@@ -54,7 +54,9 @@ class PianoDiscPlaylistCard extends HTMLElement {
   }
 
   async _load(refresh = false) {
-    if (!this._hass || this._loading) return;
+    // The card picker creates an empty preview instance. Do not issue a live
+    // websocket request until the visual editor has selected the piano.
+    if (!this._hass || !this._entityId || this._loading) return;
     this._loading = true;
     this._error = "";
     this._render();
@@ -925,4 +927,5 @@ window.customCards.push({
   type: "pianodisc-playlist-card",
   name: "PianoDisc Playlists",
   description: "Edit playlists for a PianoDisc Prodigy II piano.",
+  preview: false,
 });
