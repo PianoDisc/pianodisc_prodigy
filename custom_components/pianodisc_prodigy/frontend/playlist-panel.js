@@ -27,6 +27,10 @@ class PianoDiscPlaylistCard extends HTMLElement {
     };
   }
 
+  static getConfigElement() {
+    return document.createElement("pianodisc-playlist-card-editor");
+  }
+
   static getStubConfig() {
     return { type: "custom:pianodisc-playlist-card" };
   }
@@ -855,7 +859,67 @@ class PianoDiscPlaylistCard extends HTMLElement {
   }
 }
 
+class PianoDiscPlaylistCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+    this._config = {};
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  setConfig(config) {
+    this._config = { ...config };
+    this._render();
+  }
+
+  _render() {
+    if (!this._hass) return;
+
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host { display: block; }
+        ha-form { display: block; }
+      </style>
+      <ha-form></ha-form>
+    `;
+
+    const form = this.shadowRoot.querySelector("ha-form");
+    form.hass = this._hass;
+    form.data = { entity: this._config.entity || "" };
+    form.schema = [
+      {
+        name: "entity",
+        selector: { entity: { domain: "media_player" } },
+      },
+    ];
+    form.computeLabel = (schema) =>
+      schema.name === "entity" ? "Piano media player" : schema.name;
+    form.addEventListener("value-changed", (event) => {
+      const entity = event.detail.value.entity;
+      const config = { ...this._config };
+      if (entity) {
+        config.entity = entity;
+      } else {
+        delete config.entity;
+      }
+      this._config = config;
+      this.dispatchEvent(
+        new CustomEvent("config-changed", {
+          detail: { config },
+          bubbles: true,
+          composed: true,
+        })
+      );
+    });
+  }
+}
+
 customElements.define("pianodisc-playlist-card", PianoDiscPlaylistCard);
+customElements.define("pianodisc-playlist-card-editor", PianoDiscPlaylistCardEditor);
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "pianodisc-playlist-card",
