@@ -105,7 +105,7 @@ One **PianoDisc Prodigy II** device with these controls:
 |---|---|
 | **Piano** (media player) | Play, pause, stop, skip, volume, and browse the SD-card library |
 | **Playlist** | Pick a playlist and start it immediately |
-| **Keys active** | On while the player system is playing the piano — [needs MQTT](docs/mqtt.md) |
+| **Piano active** | On while the player system is playing the piano — [needs MQTT](docs/mqtt.md) |
 | **Library** | How many songs are on the SD card, and whether a scan is running |
 | **Readiness** | Whether the piano has finished starting up and is safe to play |
 | **Refresh library** | Re-scan the SD card after you add or remove songs |
@@ -165,7 +165,7 @@ More examples — morning routine, evening wind-down, lighting, quiet hours — 
 ### Add MQTT for instant updates
 
 With MQTT, playback state updates the moment it changes instead of on the next poll, the
-piano is discovered automatically, and the **Keys active** sensor works. If you already
+piano is discovered automatically, and the **Piano active** sensor works. If you already
 run an MQTT broker this takes a few minutes.
 
 **→ [Adding MQTT](docs/mqtt.md)**
@@ -199,7 +199,7 @@ how well they play and how they appear in Home Assistant.
 
 ## Known limitations
 
-- **"Keys active" needs MQTT.** Without a broker the sensor stays unknown, because the
+- **"Piano active" needs MQTT.** Without a broker the sensor stays unknown, because the
   piano reports it over MQTT only.
 - **Firmware entities are read-only.** They tell you when a newer firmware is available;
   installing it is done with the PianoDisc Calibrate App, which your installer or dealer

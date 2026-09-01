@@ -1,4 +1,4 @@
-"""Switch platform — independent control for a linked external power outlet."""
+"""Switch platform — AutoPlay configuration switches."""
 
 from __future__ import annotations
 
@@ -21,45 +21,13 @@ async def async_setup_entry(
     entry: PianoDiscConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the independent power proxy and AutoPlay configuration switches."""
-    entities: list[SwitchEntity] = [
-        PianoDiscAutoPlayEnableSwitch(entry.runtime_data),
-        PianoDiscAutoPlayLoopSwitch(entry.runtime_data),
-    ]
-    if entry.runtime_data.power_linked:
-        entities.insert(0, PianoDiscPowerSwitch(entry.runtime_data))
-    async_add_entities(entities)
-
-
-class PianoDiscPowerSwitch(PianoDiscEntity, SwitchEntity):
-    """Power proxy whose availability never depends on the piano transport."""
-
-    _attr_translation_key = "power"
-    _attr_icon = "mdi:power-socket"
-
-    def __init__(self, coordinator: PianoDiscCoordinator) -> None:
-        super().__init__(coordinator)
-        device_id = (
-            coordinator.config_entry.unique_id
-            or coordinator.config_entry.data[CONF_DEVICE_ID]
-        )
-        self._attr_unique_id = f"{device_id}_power"
-
-    @property
-    def available(self) -> bool:
-        # This entity represents the linked outlet, not the piano. It stays usable
-        # throughout boot, WARMING_UP, library syncing and a lost MQTT/HTTP link.
-        return self.coordinator.power_on is not None
-
-    @property
-    def is_on(self) -> bool | None:
-        return self.coordinator.power_on
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        await self.coordinator.async_set_outlet_power(True)
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        await self.coordinator.async_set_outlet_power(False)
+    """Set up AutoPlay configuration switches."""
+    async_add_entities(
+        [
+            PianoDiscAutoPlayEnableSwitch(entry.runtime_data),
+            PianoDiscAutoPlayLoopSwitch(entry.runtime_data),
+        ]
+    )
 
 
 class _PianoDiscAutoPlaySwitch(PianoDiscEntity, SwitchEntity):

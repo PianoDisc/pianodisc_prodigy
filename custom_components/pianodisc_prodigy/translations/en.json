@@ -69,7 +69,7 @@
   },
   "entity": {
     "binary_sensor": {
-      "busy": { "name": "Keys active" }
+      "busy": { "name": "Piano active" }
     },
     "sensor": {
       "library": {
