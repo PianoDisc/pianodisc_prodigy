@@ -22,7 +22,7 @@
 
 Play and automate your PianoDisc Prodigy II player piano from Home Assistant. Browse the
 songs on its SD card, start them from a dashboard, a schedule or a voice assistant, and
-edit playlists from the sidebar.
+edit playlists from your own dashboard.
 
 [![Release](https://img.shields.io/github/v/release/PianoDisc/pianodisc_prodigy?style=flat-square)](https://github.com/PianoDisc/pianodisc_prodigy/releases)
 [![HACS custom repository](https://img.shields.io/badge/HACS-Custom-41BDF5?style=flat-square)](https://hacs.xyz/)
@@ -111,14 +111,29 @@ One **PianoDisc Prodigy II** device with these controls:
 | **Refresh library** | Re-scan the SD card after you add or remove songs |
 | **Reboot** | Restart the piano |
 | **Power** | Direct control of a linked, dedicated smart plug or outlet |
+| **AutoPlay** | Enable the automatic playlist after startup |
+| **AutoPlay playlist** | Select the playlist AutoPlay uses |
+| **AutoPlay playback order** | Use the playlist default, sequence, or shuffle order |
+| **AutoPlay loop** | Repeat the AutoPlay playlist continuously |
 | **Audio firmware** / **MIDI firmware** | Shows whether newer firmware is available |
 
-Plus three sidebar workspaces: **Piano Library** for cached title search and direct song
-playback, **Piano Playlists** for creating and editing playlists without touching the SD
-card by hand, and **Piano AutoPlay** for choosing the playlist, order, and loop policy
-used after startup.
+## Recommended dashboard
 
-<!-- SCREENSHOT: the Piano Playlists panel -->
+Use the media-player card's **Browse media** action to browse the per-piano SD-card library
+and playlists. Home Assistant's native browser keeps this tied to the selected piano and
+supports the integration's cached song search.
+
+For playlist editing, add the built-in **PianoDisc Playlists** custom card to any dashboard.
+When you have more than one piano, set `entity` to the media player for the piano this card
+should edit:
+
+```yaml
+type: custom:pianodisc-playlist-card
+entity: media_player.living_room_piano
+```
+
+Add the four **AutoPlay** entities to an Entities card alongside it. They are ordinary
+configuration entities, so they can also be used directly in automations and voice control.
 
 For what each entity reports and when it's unavailable, see the
 [entity reference](docs/entities.md).
@@ -227,7 +242,6 @@ Then restart Home Assistant.
 
 Go to **Settings → Devices & services → PianoDisc Prodigy II**, open the three-dot menu on
 the integration entry, and select **Delete**. This removes the device and its entities.
-The **Piano Playlists** panel leaves the sidebar after you restart Home Assistant.
 
 To remove the files as well, open HACS, find **PianoDisc Prodigy II**, and choose
 **Remove**.

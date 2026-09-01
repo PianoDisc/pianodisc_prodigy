@@ -60,6 +60,18 @@ def _format_device_sw_version(data: ProdigyData) -> str | None:
     return ", ".join(parts) or None
 
 
+def _normalize_autoplay_config(config: dict[str, object]) -> dict[str, object]:
+    """Normalize the four settings persisted by the nRF AutoPlay implementation."""
+    playlist = config.get("playlist")
+    sort = config.get("sort")
+    return {
+        "enable": bool(config.get("enable", False)),
+        "playlist": playlist if isinstance(playlist, int) and playlist >= 0 else 0,
+        "loop": bool(config.get("loop", False)),
+        "sort": sort if isinstance(sort, int) and sort in {0, 1, 2} else 0,
+    }
+
+
 class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
     """Owns the transport and publishes ``ProdigyData`` to entities.
 
@@ -68,7 +80,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
 
     Optionally tracks a user-linked power outlet (``CONF_POWER_SWITCH``): its on/off
     state becomes the piano's power authority, and TURN_ON/TURN_OFF drive it. See
-    power-control design (revised 2026-06-08: linking grants full on/off control).
+    [[power-architecture]] (revised 2026-06-08: linking grants full on/off control).
     """
 
     config_entry: PianoDiscConfigEntry
@@ -105,13 +117,19 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         self.playlist_loading: bool = False
         self.playlist_error: str | None = None
         self._playlist_lock = asyncio.Lock()
+        # AutoPlay is one four-field device configuration. Keep one shared snapshot so
+        # its four HA entities never issue competing reads or overwrite each other.
+        self.autoplay_config: dict[str, object] | None = None
+        self.autoplay_loading: bool = False
+        self.autoplay_error: str | None = None
+        self._autoplay_lock = asyncio.Lock()
         # Optional linked power outlet (entity_id) and its last-known on/off state.
         self.power_switch: str | None = entry.options.get(CONF_POWER_SWITCH) or None
         self.power_on: bool | None = None
         # Loop-time deadline: while "now" is before it AND the piano isn't reachable
         # yet, the media_player shows a transient "starting" state. Time-bounded so it
         # can never wedge, and overridden the moment the piano reports. See
-        # power-control design.
+        # [[power-architecture]].
         self._powering_on_until = 0.0
 
     @property
@@ -125,7 +143,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
 
         Accurate because the linked switch tells us it *is* on, so this is "getting
         ready", not unknown/idle. Cleared the moment a real state arrives; time-bounded
-        so a non-responding piano can't wedge it. See power-control design.
+        so a non-responding piano can't wedge it. See [[power-architecture]].
         """
         if not (self.power_linked and self.power_on):
             return False
@@ -263,6 +281,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         try:
             await self._async_scan_library(force=True, block_player=True)
             await self.async_fetch_playlist_definitions(force=True)
+            await self.async_fetch_autoplay_config(force=True)
         except Exception:
             LOGGER.debug("Library prefetch failed", exc_info=True)
 
@@ -333,6 +352,52 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         self.playlist_error = None
         self._publish_playlist_names()
         self.async_update_listeners()
+
+    async def async_fetch_autoplay_config(
+        self, *, force: bool = False
+    ) -> dict[str, object]:
+        """Return the cached AutoPlay settings, loading them once when needed."""
+        async with self._autoplay_lock:
+            if self.autoplay_config is not None and not force:
+                return dict(self.autoplay_config)
+            self.autoplay_loading = True
+            self.autoplay_error = None
+            self.async_update_listeners()
+            try:
+                config = await self.transport.async_fetch_autoplay_config()
+            except Exception as err:
+                self.autoplay_error = str(err) or type(err).__name__
+                raise
+            else:
+                self.autoplay_config = _normalize_autoplay_config(config)
+                return dict(self.autoplay_config)
+            finally:
+                self.autoplay_loading = False
+                self.async_update_listeners()
+
+    async def async_save_autoplay_config(
+        self, changes: dict[str, object]
+    ) -> dict[str, object]:
+        """Merge and persist one AutoPlay setting without losing the other three."""
+        async with self._autoplay_lock:
+            if self.autoplay_config is None:
+                config = await self.transport.async_fetch_autoplay_config()
+                self.autoplay_config = _normalize_autoplay_config(config)
+            updated = _normalize_autoplay_config({**self.autoplay_config, **changes})
+            self.autoplay_loading = True
+            self.autoplay_error = None
+            self.async_update_listeners()
+            try:
+                await self.transport.async_save_autoplay_config(updated)
+            except Exception as err:
+                self.autoplay_error = str(err) or type(err).__name__
+                raise
+            else:
+                self.autoplay_config = updated
+                return dict(updated)
+            finally:
+                self.autoplay_loading = False
+                self.async_update_listeners()
 
     def _publish_playlist_names(self) -> None:
         """Reflect cached playlist names in the select without a second device read."""

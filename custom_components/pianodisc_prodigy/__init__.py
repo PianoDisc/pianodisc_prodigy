@@ -5,8 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from homeassistant.components.http import StaticPathConfig
-from homeassistant.components.panel_custom import async_register_panel
 from homeassistant.components import mqtt
+from homeassistant.components.frontend import (
+    DATA_EXTRA_MODULE_URL,
+    add_extra_js_url,
+    async_remove_panel,
+)
 from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
@@ -34,7 +38,7 @@ PLATFORMS: list[Platform] = [
 
 async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> bool:
     """Set up PianoDisc Prodigy II from a config entry."""
-    await _async_register_playlist_editor(hass)
+    await _async_register_frontend(hass)
     transport = await _async_build_transport(hass, entry)
     LOGGER.debug("Using transport %s for %s", type(transport).__name__, entry.title)
 
@@ -57,10 +61,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) ->
     return True
 
 
-async def _async_register_playlist_editor(hass: HomeAssistant) -> None:
-    """Expose the user-facing playlist and AutoPlay editor panels."""
+async def _async_register_frontend(hass: HomeAssistant) -> None:
+    """Register the playlist editor as a Lovelace custom-card resource."""
     data = hass.data.setdefault(DOMAIN, {})
-    if data.get("playlist_editor_registered"):
+    # v0.1.3 exposed global panels. Remove them on upgrade/reload so the old sidebar
+    # entries do not linger after the editor becomes a dashboard card.
+    for legacy_panel in (
+        "pianodisc-playlists",
+        "pianodisc-autoplay",
+        "pianodisc-library",
+    ):
+        async_remove_panel(hass, legacy_panel, warn_if_unknown=False)
+    if data.get("frontend_registered"):
         return
     await async_setup_component(hass, "http", {})
     await async_setup_component(hass, "frontend", {})
@@ -73,8 +85,6 @@ async def _async_register_playlist_editor(hass: HomeAssistant) -> None:
                 str(frontend_dir / "playlist-panel.js"),
                 cache_headers=False,
             ),
-            StaticPathConfig(f"/{DOMAIN}/autoplay-panel.js", str(frontend_dir / "autoplay-panel.js"), cache_headers=False),
-            StaticPathConfig(f"/{DOMAIN}/library-panel.js", str(frontend_dir / "library-panel.js"), cache_headers=False),
             StaticPathConfig(
                 f"/{DOMAIN}/default-album-art.png",
                 str(Path(__file__).with_name("brand") / "default-album-art.png"),
@@ -82,18 +92,11 @@ async def _async_register_playlist_editor(hass: HomeAssistant) -> None:
             )
         ]
     )
-    await async_register_panel(
-        hass,
-        frontend_url_path="pianodisc-playlists",
-        webcomponent_name="pianodisc-playlist-panel",
-        sidebar_title="Piano Playlists",
-        sidebar_icon="mdi:playlist-music",
-        module_url=f"/{DOMAIN}/playlist-panel.js",
-        require_admin=False,
-    )
-    await async_register_panel(hass, frontend_url_path="pianodisc-autoplay", webcomponent_name="pianodisc-autoplay-panel", sidebar_title="Piano AutoPlay", sidebar_icon="mdi:play-circle-outline", module_url=f"/{DOMAIN}/autoplay-panel.js", require_admin=False)
-    await async_register_panel(hass, frontend_url_path="pianodisc-library", webcomponent_name="pianodisc-library-panel", sidebar_title="Piano Library", sidebar_icon="mdi:music-note", module_url=f"/{DOMAIN}/library-panel.js", require_admin=False)
-    data["playlist_editor_registered"] = True
+    # ``frontend`` normally creates this set during setup. Keep registration safe for
+    # minimal/headless HA installations too, where the visual frontend is unavailable.
+    hass.data.setdefault(DATA_EXTRA_MODULE_URL, set())
+    add_extra_js_url(hass, f"/{DOMAIN}/playlist-panel.js")
+    data["frontend_registered"] = True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> bool:
