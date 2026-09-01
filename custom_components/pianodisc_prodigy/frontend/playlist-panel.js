@@ -407,6 +407,11 @@ class PianoDiscPlaylistCard extends HTMLElement {
           border: 1px solid var(--divider-color);
           border-radius: 6px;
         }
+        .editor-panel {
+          display: grid;
+          grid-template-rows: auto minmax(0, 1fr);
+          height: min(720px, calc(100vh - 180px));
+        }
         .card-title {
           display: flex;
           align-items: center;
@@ -458,6 +463,8 @@ class PianoDiscPlaylistCard extends HTMLElement {
           padding: 16px;
           display: grid;
           gap: 18px;
+          min-height: 0;
+          overflow-y: auto;
         }
         .fields {
           display: grid;
@@ -594,7 +601,7 @@ class PianoDiscPlaylistCard extends HTMLElement {
               ${this._playlistListTemplate()}
             </div>
           </section>
-          <section class="panel">
+          <section class="panel editor-panel">
             ${
               playlist
                 ? this._editorTemplate(playlist)
