@@ -12,6 +12,7 @@ import logging
 from typing import Final
 
 DOMAIN: Final = "pianodisc_prodigy"
+DATA_COORDINATORS: Final = "coordinators"
 LOGGER: Final = logging.getLogger(__package__)
 
 # Device identity -----------------------------------------------------------
