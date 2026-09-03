@@ -1,6 +1,6 @@
 """Config flow for PianoDisc Prodigy II.
 
-Three entry paths, all keyed on the MAC-derived deviceID so the same physical unit
+Three entry paths, all keyed on the Prodigy protocol device ID so the same physical unit
 never gets added twice:
 
 * ``async_step_user``  — manual IP (always available).
@@ -38,6 +38,7 @@ import voluptuous as vol
 from .const import (
     CONF_DEVICE_ID,
     CONF_MSC_CHANNELS,
+    CONF_NETWORK_MAC,
     CONF_POWER_SWITCH,
     DEFAULT_MSC_CHANNELS,
     DOMAIN,
@@ -75,6 +76,7 @@ class PianoDiscConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._host: str | None = None
         self._device_id: str | None = None
+        self._network_mac: str | None = None
         self._name: str | None = None
 
     @staticmethod
@@ -131,12 +133,19 @@ class PianoDiscConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_dhcp(
         self, discovery_info: DhcpServiceInfo
     ) -> ConfigFlowResult:
-        device_id = format_mac(discovery_info.macaddress).replace(":", "").upper()
+        network_mac = format_mac(discovery_info.macaddress)
+        try:
+            device_id, name = await self._async_probe(discovery_info.ip)
+        except CannotConnect:
+            return self.async_abort(reason="cannot_connect")
         await self.async_set_unique_id(device_id)
-        self._abort_if_unique_id_configured(updates={CONF_HOST: discovery_info.ip})
+        self._abort_if_unique_id_configured(
+            updates={CONF_HOST: discovery_info.ip, CONF_NETWORK_MAC: network_mac}
+        )
         self._host = discovery_info.ip
         self._device_id = device_id
-        self._name = discovery_info.hostname or _default_name(device_id)
+        self._network_mac = network_mac
+        self._name = discovery_info.hostname or name
         self.context["title_placeholders"] = {"name": self._name}
         return await self.async_step_discovery_confirm()
 
@@ -151,6 +160,11 @@ class PianoDiscConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_HOST: self._host or "",
                     CONF_DEVICE_ID: self._device_id,
                     CONF_NAME: self._name or self._device_id,
+                    **(
+                        {CONF_NETWORK_MAC: self._network_mac}
+                        if self._network_mac is not None
+                        else {}
+                    ),
                 },
             )
         return self.async_show_form(
@@ -197,7 +211,7 @@ class PianoDiscConfigFlow(ConfigFlow, domain=DOMAIN):
     async def _async_probe(self, host: str) -> tuple[str, str]:
         """Resolve ``(device_id, default_name)`` from a host over HTTP.
 
-        ``GET /debugJson?type=request`` is the only HTTP source of the MAC-derived
+        ``GET /debugJson?type=request`` is the only HTTP source of the Prodigy protocol
         deviceID and both firmware versions (see [[golden-capture]]). Never key on the
         editable ``device_name`` — it is the generic "Prodigy2" on ``/status.json``.
         """

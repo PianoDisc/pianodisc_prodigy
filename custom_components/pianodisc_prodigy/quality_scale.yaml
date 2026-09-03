@@ -55,7 +55,9 @@ rules:
   dynamic-devices:
     status: exempt
     comment: Each entry has two fixed devices at most; Show Control is option-driven, not discovered dynamically.
-  discovery-update-info: done  # dhcp registered_devices keeps the IP current
+  discovery-update-info:
+    status: todo
+    comment: DHCP-sourced entries store the real network MAC for IP updates; MQTT/manual entries still need a reliable MAC source.
   repair-issues: todo  # power_on_timeout issue added; revisit for full coverage
   docs-use-cases: todo
   docs-supported-devices: todo

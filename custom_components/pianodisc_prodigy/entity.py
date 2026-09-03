@@ -2,19 +2,14 @@
 
 from __future__ import annotations
 
-import re
-
 from homeassistant.helpers.device_registry import (
     CONNECTION_NETWORK_MAC,
     DeviceInfo,
-    format_mac,
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_DEVICE_ID, DOMAIN, MANUFACTURER, MODEL
+from .const import CONF_DEVICE_ID, CONF_NETWORK_MAC, DOMAIN, MANUFACTURER, MODEL
 from .coordinator import PianoDiscCoordinator
-
-_MAC12 = re.compile(r"^[0-9A-Fa-f]{12}$")
 
 
 class PianoDiscEntity(CoordinatorEntity[PianoDiscCoordinator]):
@@ -27,13 +22,10 @@ class PianoDiscEntity(CoordinatorEntity[PianoDiscCoordinator]):
         entry = coordinator.config_entry
         device_id: str = entry.unique_id or entry.data[CONF_DEVICE_ID]
 
-        # The deviceID is MAC-derived; when it is a bare 12-hex MAC we publish a
-        # CONNECTION_NETWORK_MAC so HA can merge this device with the same unit's
-        # squeezelite/LMS streaming player into one device card.
-        # TODO(build): verify deviceID == squeezelite player MAC on DEFAEE5C894F.
         connections: set[tuple[str, str]] = set()
-        if _MAC12.match(device_id):
-            connections = {(CONNECTION_NETWORK_MAC, format_mac(device_id))}
+        network_mac = entry.data.get(CONF_NETWORK_MAC)
+        if network_mac:
+            connections = {(CONNECTION_NETWORK_MAC, network_mac)}
 
         # Device name = firmware device_name (display only; never an identity key).
         # TODO(naming): once the squeezelite/LMS device-merge is confirmed, decide

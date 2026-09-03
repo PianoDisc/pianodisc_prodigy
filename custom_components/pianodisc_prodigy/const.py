@@ -20,6 +20,7 @@ MODEL: Final = "Prodigy II"
 
 # Config-entry / options keys (CONF_HOST and CONF_NAME come from homeassistant.const)
 CONF_DEVICE_ID: Final = "device_id"
+CONF_NETWORK_MAC: Final = "network_mac"
 # optional dedicated-outlet link (off by default)
 CONF_POWER_SWITCH: Final = "power_switch"
 CONF_MSC_CHANNELS: Final = "msc_channels"
