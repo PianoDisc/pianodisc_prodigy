@@ -132,7 +132,7 @@ class MqttTransport(Transport):
         not been configured with that broker.  In that case HTTP must remain the
         active poll/command path instead of leaving the integration at OFFLINE.
         """
-        return self._mqtt_status_seen and self._data.available
+        return self._mqtt_live
 
     @property
     def supports_msc(self) -> bool:
@@ -145,8 +145,18 @@ class MqttTransport(Transport):
 
     @property
     def _mqtt_live(self) -> bool:
-        """Return whether MQTT is presently authoritative for this piano."""
-        return self.uses_push_updates
+        """Return whether this piano has recently sent a live MQTT message.
+
+        A retained READY can be replayed by a broker long after the piano stopped
+        using that broker. It is useful metadata, but must never route commands away
+        from a reachable HTTP piano.
+        """
+        if self._mqtt_last_live_at is None:
+            return False
+        return (
+            self._hass.loop.time() - self._mqtt_last_live_at
+            < READY_WATCHDOG.total_seconds()
+        )
 
     def __init__(
         self,
@@ -172,6 +182,7 @@ class MqttTransport(Transport):
         self._playing = False
         self._playback_seen = False
         self._mqtt_status_seen = False
+        self._mqtt_last_live_at: float | None = None
         self._mqtt_volume_seen = False
         self._shuffle_target: bool | None = None
         self._shuffle_hold_until = 0.0
@@ -248,6 +259,12 @@ class MqttTransport(Transport):
 
     # -- status overlay (MQTT push) ----------------------------------------
     @callback
+    def _mark_mqtt_live(self, msg: ReceiveMessage) -> None:
+        """Record a current device message, never a retained broker replay."""
+        if not msg.retain:
+            self._mqtt_last_live_at = self._hass.loop.time()
+
+    @callback
     def _on_msc(self, msg: ReceiveMessage) -> None:
         """Forward a live MIDI Show Control message without affecting snapshots."""
         if msg.retain:
@@ -320,6 +337,7 @@ class MqttTransport(Transport):
             return
         if not isinstance(payload, dict):
             return
+        self._mark_mqtt_live(msg)
 
         raw_song = payload.get("song")
         song_path = raw_song.strip() if isinstance(raw_song, str) and raw_song.strip() else None
@@ -611,13 +629,19 @@ class MqttTransport(Transport):
     def _on_ready(self, msg: ReceiveMessage) -> None:
         """Apply the NRF-owned playback readiness reported by the ESP gateway."""
         readiness = str(msg.payload).strip().upper()
+        self._mark_mqtt_live(msg)
         if readiness == MQTT_PAYLOAD_OFFLINE:
+            self._mqtt_last_live_at = None
             self._push(available=False, readiness="OFFLINE")
             return
         # Older firmware reports OK. New firmware distinguishes a reachable gateway
         # from a piano that has completed its MIDI and SD-card startup work.
         self._push(
-            available=readiness in {"READY", "OK"},
+            available=(
+                readiness in {"READY", "OK"}
+                if not msg.retain
+                else self._data.available
+            ),
             readiness=readiness,
         )
         self._arm_watchdog()
@@ -728,6 +752,7 @@ class MqttTransport(Transport):
         self._busy_until = 0.0
         self._http_state = None
         self._mqtt_status_seen = False
+        self._mqtt_last_live_at = None
         self._mqtt_volume_seen = False
         self._shuffle_target = None
         self._shuffle_hold_until = 0.0
@@ -766,6 +791,10 @@ class MqttTransport(Transport):
         if self._closed:
             return
         if self._http is not None:
+            # This watchdog fired because status traffic has stopped. Force this
+            # cross-check through HTTP even when the previous MQTT timestamp has not
+            # reached its nominal expiry yet.
+            self._mqtt_last_live_at = None
             self._data = self._data.merge(available=False)
             try:
                 data = await self.async_fetch_snapshot()
