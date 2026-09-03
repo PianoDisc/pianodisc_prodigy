@@ -52,6 +52,10 @@ PLATFORMS: list[Platform] = [
     Platform.EVENT,
 ]
 
+# The macOS companion app keeps ES modules by URL. Bump this whenever either
+# Lovelace card changes so it cannot revive an old custom-element definition.
+_CARD_RESOURCE_REVISION = "2"
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> bool:
     """Set up PianoDisc Prodigy II from a config entry."""
@@ -83,9 +87,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) ->
 async def _async_register_frontend(hass: HomeAssistant) -> None:
     """Register the playlist editor as a Lovelace custom-card resource."""
     data = hass.data.setdefault(DOMAIN, {})
+    frontend_dir = Path(__file__).with_name("frontend")
     module_urls = (
-        f"/{DOMAIN}/playlist-panel.js",
-        f"/{DOMAIN}/library-card.js",
+        f"/{DOMAIN}/playlist-panel.js?v={_CARD_RESOURCE_REVISION}",
+        f"/{DOMAIN}/library-card.js?v={_CARD_RESOURCE_REVISION}",
     )
     # v0.1.3 exposed global panels. Remove them on upgrade/reload so the old sidebar
     # entries do not linger after the editor becomes a dashboard card.
@@ -100,12 +105,12 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
         # the old sidebar implementation. The static route is already present, but the
         # new Lovelace resource still needs to be created.
         for module_url in module_urls:
+            _replace_extra_module_url(hass, module_url)
             await _async_register_lovelace_resource(hass, module_url)
         return
     await async_setup_component(hass, "http", {})
     await async_setup_component(hass, "frontend", {})
     async_register_websocket_api(hass)
-    frontend_dir = Path(__file__).with_name("frontend")
     await hass.http.async_register_static_paths(
         [
             StaticPathConfig(
@@ -127,11 +132,20 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
     )
     # ``frontend`` normally creates this set during setup. Keep registration safe for
     # minimal/headless HA installations too, where the visual frontend is unavailable.
-    hass.data.setdefault(DATA_EXTRA_MODULE_URL, set())
     for module_url in module_urls:
-        add_extra_js_url(hass, module_url)
+        _replace_extra_module_url(hass, module_url)
         await _async_register_lovelace_resource(hass, module_url)
     data["frontend_registered"] = True
+
+
+def _replace_extra_module_url(hass: HomeAssistant, module_url: str) -> None:
+    """Replace older revisions of a card module in the frontend module set."""
+    urls = hass.data.setdefault(DATA_EXTRA_MODULE_URL, set())
+    base_url = module_url.partition("?")[0]
+    for existing in tuple(urls):
+        if existing.partition("?")[0] == base_url:
+            urls.discard(existing)
+    add_extra_js_url(hass, module_url)
 
 
 async def _async_register_lovelace_resource(hass: HomeAssistant, module_url: str) -> None:
@@ -149,7 +163,21 @@ async def _async_register_lovelace_resource(hass: HomeAssistant, module_url: str
     if not resources.loaded:
         await resources.async_load()
         resources.loaded = True
-    if any(item.get("url") == module_url for item in resources.async_items()):
+    base_url = module_url.partition("?")[0]
+    matching = [
+        item
+        for item in resources.async_items()
+        if item.get("url", "").partition("?")[0] == base_url
+    ]
+    if any(item.get("url") == module_url for item in matching):
+        return
+    if matching:
+        await resources.async_update_item(
+            matching[0]["id"],
+            {"url": module_url, CONF_RESOURCE_TYPE_WS: "module"},
+        )
+        for duplicate in matching[1:]:
+            await resources.async_delete_item(duplicate["id"])
         return
     await resources.async_create_item(
         {"url": module_url, CONF_RESOURCE_TYPE_WS: "module"}
