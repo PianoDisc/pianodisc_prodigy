@@ -53,8 +53,8 @@ class FakeTransport(Transport):
             source=None,
             source_list=[],
             device_name=device_name,
-            firmware_audio="0.4.7",
-            firmware_midi="1.3.5",
+            firmware_audio="0.5.0",
+            firmware_midi="1.4.0",
         )
         self.playlists: list[dict[str, object]] = [
             {
