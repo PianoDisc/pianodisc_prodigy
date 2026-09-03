@@ -152,9 +152,11 @@ SONG_UNKNOWN_GRACE: Final = 30.0  # seconds
 # the device's reading catches up (or this lapses) so the shuffle switch sticks.
 SHUFFLE_HOLD_GRACE: Final = 60.0  # seconds
 
-# Firmware version policy (decision #3). Floors/recommended.
-# TODO: confirm the exact compat range with the audio-engine team.
-FW_AUDIO_FLOOR: Final = "0.4.5"
-FW_AUDIO_RECOMMENDED: Final = "0.4.7"
-FW_MIDI_FLOOR: Final = "1.0.5"
-FW_MIDI_RECOMMENDED: Final = "1.3.5"
+# Firmware version policy. Floors are the first released builds carrying the
+# Home Assistant behavior this integration depends on; recommended values are only
+# the fallback latest-version signal when the piano does not report backend update
+# data itself. Actual installed versions are always displayed from device telemetry.
+FW_AUDIO_FLOOR: Final = "0.5.0"
+FW_AUDIO_RECOMMENDED: Final = "0.5.0"
+FW_MIDI_FLOOR: Final = "1.4.0"
+FW_MIDI_RECOMMENDED: Final = "1.4.0"
