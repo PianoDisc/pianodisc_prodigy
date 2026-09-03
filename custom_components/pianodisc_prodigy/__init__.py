@@ -23,9 +23,18 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 from homeassistant.setup import async_setup_component
 
-from .const import CONF_DEVICE_ID, DOMAIN, LOGGER, MANUFACTURER, MAX_MSC_CHANNELS, MODEL
+from .const import (
+    CONF_DEVICE_ID,
+    CONF_NETWORK_MAC,
+    DOMAIN,
+    LOGGER,
+    MANUFACTURER,
+    MAX_MSC_CHANNELS,
+    MODEL,
+)
 from .coordinator import PianoDiscConfigEntry, PianoDiscCoordinator
 from .transports import Transport
 from .transports.http import HttpTransport
@@ -195,9 +204,14 @@ def _async_sync_msc_registry(
             device_registry.async_remove_device(device.id)
         return
 
+    connections = set()
+    network_mac = entry.data.get(CONF_NETWORK_MAC)
+    if network_mac:
+        connections.add((CONNECTION_NETWORK_MAC, network_mac))
     piano = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, device_id)},
+        connections=connections,
         manufacturer=MANUFACTURER,
         model=MODEL,
         name=coordinator.data.device_name or entry.title,
