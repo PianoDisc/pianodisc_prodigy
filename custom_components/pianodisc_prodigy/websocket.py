@@ -71,10 +71,16 @@ async def websocket_playlist_data(
         )
         return
     try:
-        if msg["refresh"]:
-            # Refresh both caches, then return exactly those shared cache values.
+        refresh_library = msg["refresh"] and not coordinator.library_ready
+        if refresh_library:
+            # Playlist refresh normally only reloads playlist definitions. The SD
+            # scan is slow and unnecessary when this HA run already owns a complete
+            # song cache. On a cold cache, retain the old recovery path: scan songs
+            # first, then return the freshly populated shared caches.
             await coordinator.async_refresh_library()
-        playlists = await coordinator.async_fetch_playlist_definitions()
+        playlists = await coordinator.async_fetch_playlist_definitions(
+            force=msg["refresh"] and not refresh_library
+        )
         paths = await coordinator.transport.async_fetch_song_paths()
     except Exception as err:
         connection.send_error(msg["id"], "playlist_load_failed", str(err))
