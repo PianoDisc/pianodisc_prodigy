@@ -6,11 +6,7 @@ from pathlib import Path
 
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.components import mqtt
-from homeassistant.components.frontend import (
-    DATA_EXTRA_MODULE_URL,
-    add_extra_js_url,
-    async_remove_panel,
-)
+from homeassistant.components.frontend import async_remove_panel
 from homeassistant.components.lovelace.const import (
     CONF_RESOURCE_TYPE_WS,
     LOVELACE_DATA,
@@ -29,6 +25,7 @@ from homeassistant.setup import async_setup_component
 from .const import (
     CONF_DEVICE_ID,
     CONF_NETWORK_MAC,
+    DATA_COORDINATORS,
     DOMAIN,
     LOGGER,
     MANUFACTURER,
@@ -71,6 +68,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) ->
     _async_sync_msc_registry(hass, entry, coordinator)
 
     entry.runtime_data = coordinator
+    hass.data.setdefault(DOMAIN, {}).setdefault(DATA_COORDINATORS, {})[
+        entry.entry_id
+    ] = coordinator
     # An options change (linking/unlinking the power outlet) reloads the entry so the
     # coordinator re-reads it and the media_player recomputes its supported features.
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
@@ -105,7 +105,6 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
         # the old sidebar implementation. The static route is already present, but the
         # new Lovelace resource still needs to be created.
         for module_url in module_urls:
-            _replace_extra_module_url(hass, module_url)
             await _async_register_lovelace_resource(hass, module_url)
         return
     await async_setup_component(hass, "http", {})
@@ -130,22 +129,9 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
             )
         ]
     )
-    # ``frontend`` normally creates this set during setup. Keep registration safe for
-    # minimal/headless HA installations too, where the visual frontend is unavailable.
     for module_url in module_urls:
-        _replace_extra_module_url(hass, module_url)
         await _async_register_lovelace_resource(hass, module_url)
     data["frontend_registered"] = True
-
-
-def _replace_extra_module_url(hass: HomeAssistant, module_url: str) -> None:
-    """Replace older revisions of a card module in the frontend module set."""
-    urls = hass.data.setdefault(DATA_EXTRA_MODULE_URL, set())
-    base_url = module_url.partition("?")[0]
-    for existing in tuple(urls):
-        if existing.partition("?")[0] == base_url:
-            urls.discard(existing)
-    add_extra_js_url(hass, module_url)
 
 
 async def _async_register_lovelace_resource(hass: HomeAssistant, module_url: str) -> None:
@@ -186,7 +172,10 @@ async def _async_register_lovelace_resource(hass: HomeAssistant, module_url: str
 
 async def async_unload_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded:
+        hass.data.get(DOMAIN, {}).get(DATA_COORDINATORS, {}).pop(entry.entry_id, None)
+    return unloaded
 
 
 def _remove_legacy_shuffle_entity(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> None:

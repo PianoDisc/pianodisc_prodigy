@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 
-from .const import DOMAIN
+from .const import DATA_COORDINATORS, DOMAIN
 from .coordinator import PianoDiscCoordinator
 from .transports.http import title_from_path
 
@@ -149,10 +149,14 @@ def _coordinator_from_msg(
         or registry_entry.config_entry_id is None
     ):
         raise ValueError(f"{entity_id} is not a PianoDisc media player")
-    config_entry = hass.config_entries.async_get_entry(registry_entry.config_entry_id)
-    if config_entry is None or config_entry.runtime_data is None:
+    coordinator = (
+        hass.data.get(DOMAIN, {})
+        .get(DATA_COORDINATORS, {})
+        .get(registry_entry.config_entry_id)
+    )
+    if not isinstance(coordinator, PianoDiscCoordinator):
         raise ValueError(f"{entity_id} is not loaded")
-    return config_entry.runtime_data, entity_id
+    return coordinator, entity_id
 
 
 def _media_player_entities(hass: HomeAssistant) -> list[dict[str, str]]:
