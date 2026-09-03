@@ -202,8 +202,18 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
             data = await self.transport.async_fetch_snapshot()
         except Exception as err:  # transports raise heterogeneous errors
             raise UpdateFailed(f"Error polling piano: {err}") from err
+        previous_readiness = self.data.readiness if self.data is not None else "unknown"
+        became_ready = data.readiness in {"READY", "OK"} and previous_readiness not in {
+            "READY",
+            "OK",
+        }
         self._retune_interval(data)
         self._observe_msc_reset(self.data, data)
+        # MQTT pushes already cover this transition. HTTP-only and an MQTT-silent
+        # hybrid reach READY through this polling path, so give them the same initial
+        # library/playlist/AutoPlay prefetch.
+        if self.data is not None and became_ready:
+            self._schedule_library_prefetch()
         return data
 
     @callback

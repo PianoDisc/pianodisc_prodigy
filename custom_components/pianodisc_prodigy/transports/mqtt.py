@@ -126,11 +126,27 @@ class MqttTransport(Transport):
 
     @property
     def uses_push_updates(self) -> bool:
-        return True
+        """Whether the piano itself is currently delivering live MQTT status.
+
+        Home Assistant can have an MQTT client even when this particular piano has
+        not been configured with that broker.  In that case HTTP must remain the
+        active poll/command path instead of leaving the integration at OFFLINE.
+        """
+        return self._mqtt_status_seen and self._data.available
 
     @property
     def supports_msc(self) -> bool:
         return True
+
+    @property
+    def supports_realtime_events(self) -> bool:
+        """Events are usable only while this piano is live on MQTT."""
+        return self._mqtt_live
+
+    @property
+    def _mqtt_live(self) -> bool:
+        """Return whether MQTT is presently authoritative for this piano."""
+        return self.uses_push_updates
 
     def __init__(
         self,
@@ -813,23 +829,35 @@ class MqttTransport(Transport):
         command: dict = {"exec": "Play"}
         if index is not None and index >= 0:
             command["params"] = int(index)
-        await self._publish(command)
+        if not self._mqtt_live and self._http is not None:
+            await self._http.async_play(index)
+        else:
+            await self._publish(command)
         self._push()
 
     async def async_play_path(self, path: str) -> None:
         """Ask the NRF to resolve a path against its current SD-card library."""
         self._playback_seen = True
         self._optimistic_new_song()
-        await self._publish(
-            {"type": "MIDIPlayer", "exec": "Playback", "params": {"song": path}}
-        )
+        if not self._mqtt_live and self._http is not None:
+            await self._http.async_play_path(path)
+        else:
+            await self._publish(
+                {"type": "MIDIPlayer", "exec": "Playback", "params": {"song": path}}
+            )
         self._push()
 
     async def async_pause(self) -> None:
-        await self._publish({"exec": "Pause"})
+        if not self._mqtt_live and self._http is not None:
+            await self._http.async_pause()
+        else:
+            await self._publish({"exec": "Pause"})
 
     async def async_stop(self) -> None:
-        await self._publish({"exec": "Stop"})
+        if not self._mqtt_live and self._http is not None:
+            await self._http.async_stop()
+        else:
+            await self._publish({"exec": "Stop"})
         # Once playback has been seen, the device's Stop state is not HA "idle": keep
         # the card in PAUSED/Loading so the next Play can resume the visible surface.
         # On a cold/unknown stop, fall back to IDLE.
@@ -847,12 +875,18 @@ class MqttTransport(Transport):
 
     async def async_next(self) -> None:
         self._optimistic_new_song()
-        await self._publish({"exec": "Next"})
+        if not self._mqtt_live and self._http is not None:
+            await self._http.async_next()
+        else:
+            await self._publish({"exec": "Next"})
         self._push()
 
     async def async_previous(self) -> None:
         self._optimistic_new_song()
-        await self._publish({"exec": "Prev"})
+        if not self._mqtt_live and self._http is not None:
+            await self._http.async_previous()
+        else:
+            await self._publish({"exec": "Prev"})
         self._push()
 
     async def async_set_volume(self, level_1_100: int) -> None:
@@ -861,7 +895,10 @@ class MqttTransport(Transport):
             self._pre_mute_volume = int(level_1_100)
         self._mqtt_volume_seen = True
         self._push(volume=int(level_1_100))
-        await self._publish({"exec": "SetVolume", "params": int(level_1_100)})
+        if not self._mqtt_live and self._http is not None:
+            await self._http.async_set_volume(level_1_100)
+        else:
+            await self._publish({"exec": "SetVolume", "params": int(level_1_100)})
 
     async def async_mute_volume(self, mute: bool) -> None:
         if mute and self._data.volume is not None and self._data.volume > 0:
@@ -869,18 +906,24 @@ class MqttTransport(Transport):
         target = 0 if mute else self._pre_mute_volume
         self._mqtt_volume_seen = True
         self._push(volume=target)
-        await self._publish({"exec": "SetMute", "params": bool(mute)})
+        if not self._mqtt_live and self._http is not None:
+            await self._http.async_mute_volume(mute)
+        else:
+            await self._publish({"exec": "SetMute", "params": bool(mute)})
 
     async def async_set_shuffle(self, shuffle: bool) -> None:
         self._shuffle_target = shuffle
         self._shuffle_hold_until = self._hass.loop.time() + SHUFFLE_HOLD_GRACE
-        await self._publish({"exec": "Sort", "params": 1 if shuffle else 0})
+        if not self._mqtt_live and self._http is not None:
+            await self._http.async_set_shuffle(shuffle)
+        else:
+            await self._publish({"exec": "Sort", "params": 1 if shuffle else 0})
         self._push(shuffle=shuffle)
 
     async def async_set_repeat(self, mode: int) -> None:
         if mode not in (0, 1, 2):
             raise ValueError(f"invalid repeat mode: {mode}")
-        if not self._data.available and self._http is not None:
+        if not self._mqtt_live and self._http is not None:
             await self._http.async_set_repeat(mode)
         else:
             await self._publish({"exec": "Repeat", "params": mode})
@@ -889,7 +932,7 @@ class MqttTransport(Transport):
     async def async_select_playlist(self, name: str) -> None:
         # Match the rest of hybrid control: an offline MQTT transport must not
         # prevent playlist playback when the piano's HTTP API is still reachable.
-        if not self._data.available and self._http is not None:
+        if not self._mqtt_live and self._http is not None:
             await self._http.async_fetch_playlists()
             await self._http.async_select_playlist(name)
             self._push(source=name)
@@ -917,7 +960,7 @@ class MqttTransport(Transport):
     async def async_reboot(self) -> None:
         # Prefer MQTT when the device is live (or when MQTT is the only transport).
         # Hybrid mode falls back to HTTP only after MQTT has gone stale/offline.
-        if self._data.available or self._http is None:
+        if self._mqtt_live or self._http is None:
             await self._publish({"exec": "Reboot"})
             self.invalidate()
             self._emit(self._data)
@@ -932,51 +975,54 @@ class MqttTransport(Transport):
 
     # -- snapshot (HTTP fallback/backfill) + library -----------------------
     async def async_fetch_snapshot(self) -> ProdigyData:
-        mqtt_is_live = self._data.available and self._mqtt_status_seen
+        mqtt_is_live = self._mqtt_live
         if self._http is not None and not mqtt_is_live:
             playback = await self._http.async_fetch_playback(
                 fetch_volume=not self._mqtt_volume_seen
             )
-            if playback.available:
-                volume = (
-                    self._data.volume
-                    if self._mqtt_volume_seen or playback.volume is None
-                    else playback.volume
-                )
-                if mqtt_is_live:
-                    merged = self._data.merge(
-                        available=True,
-                        volume=volume,
-                        source_list=playback.source_list or self._data.source_list,
+            volume = (
+                self._data.volume
+                if self._mqtt_volume_seen or playback.volume is None
+                else playback.volume
+            )
+            self._http_state = playback.state
+            if playback.state == MediaPlayerState.IDLE:
+                self._stopped = False  # device confirms idle → release the stop hold
+            song = self._resolve_song(playback.song)
+            # HTTP is authoritative whenever this piano is not live on MQTT. In
+            # particular, it must replace an MQTT watchdog's stale OFFLINE with the
+            # ESP's current WARMING_UP/READY state.
+            merged = self._data.merge(
+                available=playback.available,
+                readiness=playback.readiness,
+                volume=volume,
+                song=song,
+                song_path=playback.song_path if song is not None else None,
+                song_index=playback.song_index,
+                song_count=playback.song_count,
+                media_position=playback.media_position,
+                media_duration=playback.media_duration,
+                media_position_updated_at=playback.media_position_updated_at,
+                shuffle=self._resolve_shuffle(playback.shuffle),
+                queue_mode=playback.queue_mode,
+                repeat_mode=playback.repeat_mode,
+                playlist_repeat=playback.playlist_repeat,
+                autoplay_loop=playback.autoplay_loop,
+                source=playback.source,
+                source_list=playback.source_list or self._data.source_list,
+                busy=None,
+                ip_address=playback.ip_address or self._data.ip_address,
+            )
+            if playback.available and merged.firmware_audio is None:
+                # Firmware is static. Fetch it once only after the HTTP endpoint is
+                # actually reachable, rather than repeatedly probing a cold piano.
+                info = await self._http.async_get_device_info()
+                if info:
+                    merged = merged.merge(
+                        firmware_audio=info["audio_version"],
+                        firmware_midi=info["midi_version"],
                     )
-                else:
-                    self._http_state = playback.state
-                    if playback.state == MediaPlayerState.IDLE:
-                        self._stopped = (
-                            False  # device confirms idle → release the stop hold
-                        )
-                    song = self._resolve_song(playback.song)
-                    merged = self._data.merge(
-                        available=True,
-                        volume=volume,
-                        song=song,
-                        song_path=playback.song_path if song is not None else None,
-                        song_index=playback.song_index,
-                        song_count=playback.song_count,
-                        media_position=playback.media_position,
-                        media_duration=playback.media_duration,
-                        media_position_updated_at=playback.media_position_updated_at,
-                        shuffle=self._resolve_shuffle(playback.shuffle),
-                        source_list=playback.source_list or self._data.source_list,
-                    )
-                if merged.firmware_audio is None:  # firmware is static → fetch once
-                    info = await self._http.async_get_device_info()
-                    if info:
-                        merged = merged.merge(
-                            firmware_audio=info["audio_version"],
-                            firmware_midi=info["midi_version"],
-                        )
-                self._data = merged
+            self._data = merged
         self._data = self._data.merge(state=self._derive_state())
         return self._data
 

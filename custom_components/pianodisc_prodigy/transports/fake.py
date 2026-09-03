@@ -33,6 +33,10 @@ class FakeTransport(Transport):
     def supports_msc(self) -> bool:
         return True
 
+    @property
+    def supports_realtime_events(self) -> bool:
+        return True
+
     def __init__(self, device_name: str = "Demo Prodigy") -> None:
         super().__init__()
         self.reboot_count = 0

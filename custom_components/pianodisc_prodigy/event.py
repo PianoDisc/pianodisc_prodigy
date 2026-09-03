@@ -43,6 +43,16 @@ class PianoDiscMscFire(PianoDiscShowControlEntity, EventEntity):
         self._channel = channel
         self._attr_unique_id = f"{device_id}_msc_fire_ch{channel}"
         self._attr_translation_placeholders = {"channel": str(channel)}
+        if not coordinator.transport.supports_msc:
+            self._attr_name = f"MSC channel {channel} fire (MQTT required)"
+
+    @property
+    def available(self) -> bool:
+        return (
+            super().available
+            and self.coordinator.transport.supports_msc
+            and self.coordinator.transport.supports_realtime_events
+        )
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()

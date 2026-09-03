@@ -56,6 +56,11 @@ class Transport(ABC):
         """True when this transport can receive live MIDI Show Control cues."""
         return False
 
+    @property
+    def supports_realtime_events(self) -> bool:
+        """True when live piano-originated events are currently observable."""
+        return False
+
     # -- lifecycle ----------------------------------------------------------
     @abstractmethod
     async def async_setup(self) -> None:
