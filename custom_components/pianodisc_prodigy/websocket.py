@@ -18,7 +18,6 @@ from .transports.http import title_from_path
 
 _WS_DATA = f"{DOMAIN}/playlist_data"
 _WS_SAVE = f"{DOMAIN}/save_playlists"
-_WS_LIBRARY_DATA = f"{DOMAIN}/library_data"
 
 
 def _library_ui_status(coordinator: PianoDiscCoordinator) -> str:
@@ -32,61 +31,9 @@ def _library_ui_status(coordinator: PianoDiscCoordinator) -> str:
 
 @callback
 def async_register_websocket_api(hass: HomeAssistant) -> None:
-    """Register custom-card websocket commands."""
+    """Register playlist editor websocket commands."""
     websocket_api.async_register_command(hass, websocket_playlist_data)
     websocket_api.async_register_command(hass, websocket_save_playlists)
-    websocket_api.async_register_command(hass, websocket_library_data)
-
-
-@websocket_api.websocket_command(
-    {
-        vol.Required("type"): _WS_LIBRARY_DATA,
-        vol.Optional("entity_id"): cv.entity_id,
-    }
-)
-@websocket_api.async_response
-async def websocket_library_data(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
-) -> None:
-    """Return the existing library cache for the Library card.
-
-    The card must not rely on ``media_player/browse_media``: the player purposely
-    withdraws that feature while the shared SD buffer is initially being scanned.
-    """
-    try:
-        coordinator, entity_id = _coordinator_from_msg(hass, msg)
-    except ValueError as err:
-        connection.send_error(msg["id"], "not_found", str(err))
-        return
-
-    library_status = _library_ui_status(coordinator)
-    if library_status != "ready":
-        connection.send_result(
-            msg["id"],
-            {
-                "entity_id": entity_id,
-                "library_status": library_status,
-                "songs": [],
-            },
-        )
-        return
-    try:
-        paths = await coordinator.transport.async_fetch_song_paths()
-    except Exception as err:
-        connection.send_error(msg["id"], "library_load_failed", str(err))
-        return
-    connection.send_result(
-        msg["id"],
-        {
-            "entity_id": entity_id,
-            "library_status": "ready",
-            "songs": [
-                {"title": title_from_path(path), "path": path} for path in paths
-            ],
-        },
-    )
 
 
 @websocket_api.websocket_command(
