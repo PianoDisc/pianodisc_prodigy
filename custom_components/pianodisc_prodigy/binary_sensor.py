@@ -45,11 +45,25 @@ class PianoDiscBusySensor(PianoDiscEntity, BinarySensorEntity):
             or coordinator.config_entry.data[CONF_DEVICE_ID]
         )
         self._attr_unique_id = f"{device_id}_busy"
+        if not coordinator.transport.supports_msc:
+            self._attr_name = "Piano active (MQTT required)"
 
     @property
     def is_on(self) -> bool | None:
-        # None (unknown) in HTTP-only mode — there is no HTTP equivalent for busy.
+        # No HTTP equivalent exists. A HA MQTT client alone is also insufficient:
+        # wait until this piano itself has supplied live MQTT status.
+        if not self.coordinator.transport.supports_realtime_events:
+            return None
         return self.coordinator.data.busy
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str]:
+        if self.coordinator.transport.supports_realtime_events:
+            return {}
+        return {
+            "requires": "MQTT",
+            "setup": "Configure this piano to use Home Assistant's MQTT broker.",
+        }
 
 
 class PianoDiscMscChannel(PianoDiscShowControlEntity, BinarySensorEntity):
@@ -65,9 +79,20 @@ class PianoDiscMscChannel(PianoDiscShowControlEntity, BinarySensorEntity):
         self._channel = channel
         self._attr_unique_id = f"{device_id}_msc_ch{channel}"
         self._attr_translation_placeholders = {"channel": str(channel)}
+        if not coordinator.transport.supports_msc:
+            self._attr_name = f"MSC channel {channel} (MQTT required)"
 
     @property
     def is_on(self) -> bool | None:
-        if not self.coordinator.transport.supports_msc:
+        if not self.coordinator.transport.supports_realtime_events:
             return None
         return self.coordinator.msc_channel_states.get(self._channel, False)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str]:
+        if self.coordinator.transport.supports_realtime_events:
+            return {}
+        return {
+            "requires": "MQTT",
+            "setup": "Configure this piano to use Home Assistant's MQTT broker.",
+        }
