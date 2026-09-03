@@ -14,6 +14,7 @@ class PianoDiscPlaylistCard extends HTMLElement {
       this._entityId = entityId;
       if (this._loaded) this._load();
     }
+    if (!this._loaded) this._render();
   }
 
   getCardSize() {
@@ -55,8 +56,13 @@ class PianoDiscPlaylistCard extends HTMLElement {
 
   async _load(refresh = false) {
     // The card picker creates an empty preview instance. Do not issue a live
-    // websocket request until the visual editor has selected the piano.
-    if (!this._hass || !this._entityId || this._loading) return;
+    // websocket request until the visual editor has selected the piano, but do
+    // render a complete empty-config state so the picker does not spin forever.
+    if (!this._hass || this._loading) return;
+    if (!this._entityId) {
+      this._render();
+      return;
+    }
     this._loading = true;
     this._error = "";
     this._render();

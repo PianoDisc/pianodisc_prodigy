@@ -9,7 +9,11 @@ class PianoDiscLibraryCard extends HTMLElement {
 
   setConfig(config) {
     this._config = config || {};
-    if (this._loaded) this._load();
+    if (this._loaded) {
+      this._load();
+    } else {
+      this._render();
+    }
   }
 
   getCardSize() { return 8; }
@@ -34,7 +38,6 @@ class PianoDiscLibraryCard extends HTMLElement {
     this._query = "";
     this._loading = false;
     this._error = "";
-    this._libraryStatus = "syncing";
   }
 
   get _entityId() {
@@ -52,14 +55,12 @@ class PianoDiscLibraryCard extends HTMLElement {
     this._render();
     try {
       const result = await this._hass.callWS({
-        type: "pianodisc_prodigy/library_data",
+        type: "media_player/browse_media",
         entity_id: this._entityId,
+        media_content_type: "library:songs",
+        media_content_id: "library:songs",
       });
-      this._libraryStatus = result.library_status || "ready";
-      this._songs = (result.songs || []).map((song) => ({
-        title: song.title,
-        path: song.path,
-      }));
+      this._songs = result.children || [];
     } catch (error) {
       this._error = error?.message || "Unable to load the piano library.";
     } finally {
@@ -72,8 +73,8 @@ class PianoDiscLibraryCard extends HTMLElement {
     try {
       await this._hass.callService("media_player", "play_media", {
         entity_id: this._entityId,
-        media_content_type: "music",
-        media_content_id: song.path,
+        media_content_type: song.media_content_type,
+        media_content_id: song.media_content_id,
       });
     } catch (error) {
       this._error = error?.message || "Unable to start this song.";
@@ -96,19 +97,13 @@ class PianoDiscLibraryCard extends HTMLElement {
     const songs = this._songs.filter((song) =>
       !query || song.title.toLocaleLowerCase().includes(query)
     );
-    const waiting = this._libraryStatus !== "ready";
-    const waitingMessage = this._libraryStatus === "preparing"
-      ? "Preparing piano..."
-      : "Syncing library...";
     const body = this._loading
       ? '<div class="empty">Loading library...</div>'
       : this._error
         ? `<div class="error">${this._escape(this._error)}</div>`
-        : waiting
-          ? `<div class="empty">${waitingMessage}</div>`
         : songs.length
           ? songs.map((song) => `
-              <button class="song" data-path="${this._escapeAttr(song.path)}">
+              <button class="song" data-id="${this._escapeAttr(song.media_content_id)}">
                 <ha-icon icon="mdi:play"></ha-icon>
                 <span>${this._escape(song.title)}</span>
               </button>`).join("")
@@ -130,7 +125,7 @@ class PianoDiscLibraryCard extends HTMLElement {
       </style>
       <ha-card><div class="page">
         <header><h2>Piano Library</h2><button class="icon" title="Reload song list" data-action="refresh"><ha-icon icon="mdi:refresh"></ha-icon></button></header>
-        <input type="search" placeholder="Search songs" value="${this._escapeAttr(this._query)}" ${(this._loading || waiting) ? "disabled" : ""}>
+        <input type="search" placeholder="Search songs" value="${this._escapeAttr(this._query)}" ${this._loading ? "disabled" : ""}>
         <div class="songs">${body}</div>
       </div></ha-card>`;
     this.shadowRoot.querySelector("input")?.addEventListener("input", (event) => {
@@ -140,7 +135,7 @@ class PianoDiscLibraryCard extends HTMLElement {
     this.shadowRoot.querySelector("[data-action='refresh']")?.addEventListener("click", () => this._load());
     this.shadowRoot.querySelectorAll(".song").forEach((button) =>
       button.addEventListener("click", () => {
-        const song = this._songs.find((item) => item.path === button.dataset.path);
+        const song = this._songs.find((item) => item.media_content_id === button.dataset.id);
         if (song) this._play(song);
       })
     );
