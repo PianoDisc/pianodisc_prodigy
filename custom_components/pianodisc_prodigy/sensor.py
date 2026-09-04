@@ -33,7 +33,7 @@ async def async_setup_entry(
             PianoDiscLibrarySensor(entry.runtime_data),
             PianoDiscLibraryStatusSensor(entry.runtime_data),
             PianoDiscPlaylistStatusSensor(entry.runtime_data),
-            PianoDiscReadinessSensor(entry.runtime_data),
+            PianoDiscStatusSensor(entry.runtime_data),
             PianoDiscIpAddressSensor(entry.runtime_data),
             PianoDiscWifiSignalSensor(entry.runtime_data),
         ]
@@ -77,7 +77,7 @@ class PianoDiscLibrarySensor(PianoDiscEntity, SensorEntity):
 class PianoDiscLibraryStatusSensor(PianoDiscEntity, SensorEntity):
     """Make hardware startup and HA's library-sync phase visibly distinct."""
 
-    _attr_name = "Library status"
+    _attr_translation_key = "library_status"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:database-sync"
 
@@ -101,7 +101,7 @@ class PianoDiscLibraryStatusSensor(PianoDiscEntity, SensorEntity):
 class PianoDiscPlaylistStatusSensor(PianoDiscEntity, SensorEntity):
     """Expose playlist cache loading, emptiness, and failures separately."""
 
-    _attr_name = "Playlist status"
+    _attr_translation_key = "playlist_status"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:playlist-check"
 
@@ -128,12 +128,23 @@ class PianoDiscPlaylistStatusSensor(PianoDiscEntity, SensorEntity):
         return {"error": self.coordinator.playlist_error}
 
 
-class PianoDiscReadinessSensor(PianoDiscEntity, SensorEntity):
+class PianoDiscStatusSensor(PianoDiscEntity, SensorEntity):
     """Report whether the NRF has completed its safe-to-play startup work."""
 
-    _attr_name = "Readiness"
+    _attr_translation_key = "status"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.ENUM
     _attr_icon = "mdi:piano"
+    _attr_options = [
+        "unknown",
+        "STARTING",
+        "WARMING_UP",
+        "SYNCING",
+        "READY",
+        "OK",
+        "OFFLINE",
+        "NO_SD",
+    ]
 
     def __init__(self, coordinator: PianoDiscCoordinator) -> None:
         super().__init__(coordinator)
@@ -159,7 +170,7 @@ class PianoDiscReadinessSensor(PianoDiscEntity, SensorEntity):
 class PianoDiscIpAddressSensor(PianoDiscEntity, SensorEntity):
     """Expose the current LAN address advertised by the ESP over MQTT."""
 
-    _attr_name = "IP address"
+    _attr_translation_key = "ip_address"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:ip-network"
 

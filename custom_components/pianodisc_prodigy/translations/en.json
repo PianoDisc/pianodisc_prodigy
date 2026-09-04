@@ -76,7 +76,13 @@
   },
   "entity": {
     "binary_sensor": {
-      "busy": { "name": "Piano active" },
+      "busy": {
+        "name": "Busy",
+        "state": {
+          "on": "Busy",
+          "off": "Idle"
+        }
+      },
       "msc_channel": { "name": "MSC channel {channel}" }
     },
     "sensor": {
@@ -85,6 +91,31 @@
         "state_attributes": {
           "scanning": { "name": "Scanning" }
         }
+      },
+      "library_status": {
+        "name": "Library status"
+      },
+      "playlist_status": {
+        "name": "Playlist status"
+      },
+      "status": {
+        "name": "Status",
+        "state": {
+          "unknown": "Unknown",
+          "STARTING": "Starting",
+          "WARMING_UP": "Warming up",
+          "SYNCING": "Syncing library",
+          "READY": "Ready",
+          "OK": "Ready",
+          "OFFLINE": "Offline",
+          "NO_SD": "No SD card"
+        },
+        "state_attributes": {
+          "library_status": { "name": "Library status" }
+        }
+      },
+      "ip_address": {
+        "name": "IP address"
       },
       "wifi_signal": {
         "name": "Wi-Fi signal",

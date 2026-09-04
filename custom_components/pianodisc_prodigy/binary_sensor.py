@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
-    BinarySensorEntity,
-)
+from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -36,7 +33,6 @@ class PianoDiscBusySensor(PianoDiscEntity, BinarySensorEntity):
     """True while the piano's solenoids are striking keys."""
 
     _attr_translation_key = "busy"
-    _attr_device_class = BinarySensorDeviceClass.RUNNING
 
     def __init__(self, coordinator: PianoDiscCoordinator) -> None:
         super().__init__(coordinator)
@@ -45,8 +41,6 @@ class PianoDiscBusySensor(PianoDiscEntity, BinarySensorEntity):
             or coordinator.config_entry.data[CONF_DEVICE_ID]
         )
         self._attr_unique_id = f"{device_id}_busy"
-        if not coordinator.transport.supports_msc:
-            self._attr_name = "Piano active (MQTT required)"
 
     @property
     def is_on(self) -> bool | None:
@@ -79,8 +73,6 @@ class PianoDiscMscChannel(PianoDiscShowControlEntity, BinarySensorEntity):
         self._channel = channel
         self._attr_unique_id = f"{device_id}_msc_ch{channel}"
         self._attr_translation_placeholders = {"channel": str(channel)}
-        if not coordinator.transport.supports_msc:
-            self._attr_name = f"MSC channel {channel} (MQTT required)"
 
     @property
     def is_on(self) -> bool | None:

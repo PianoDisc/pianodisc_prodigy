@@ -67,7 +67,7 @@ integration, choose **Reconfigure**, and enter the piano's IP.
 
 See [Adding MQTT](mqtt.md).
 
-## Keys active never changes
+## Busy never changes
 
 This sensor needs MQTT. Without a broker the piano has no way to report it and the sensor
 stays unknown. See [Adding MQTT](mqtt.md).
@@ -92,7 +92,7 @@ started, though connecting MIDI from it does send an off event that halts auto-p
 ## The piano is playing but Home Assistant shows no song
 
 Usually this means the music was started from the **iQ App**. Home Assistant sees the keys
-moving — **Keys active** turns on and the piano shows as playing — but it gets no title,
+moving — **Busy** turns on and the piano shows as playing — but it gets no title,
 duration or position, so the now-playing line stays empty.
 
 Nothing is broken. Home Assistant tracks what the piano plays from its own SD card; music
@@ -109,7 +109,7 @@ controls, or auto-play instead.
 - Folders work, but deeply nested ones are unreliable — the root of the card is safest.
 - Check `index.txt` on the card. The piano regenerates it on every scan, and it lists every
   song it recognised, so anything missing from that file was never detected.
-- If the count is stuck at zero, check the **Readiness** sensor. `NO_SD` means the piano
+- If the count is stuck at zero, check the **Status** sensor. `NO_SD` means the piano
   isn't seeing the card at all.
 
 See [SD card, MIDI files and playlists](sd-card.md).

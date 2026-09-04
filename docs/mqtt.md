@@ -9,7 +9,7 @@ what it adds.
 |---|---|---|
 | Playback state | Updated every 30 seconds | Updates the moment it changes |
 | Finding the piano | You enter its IP address | Discovered automatically |
-| **Keys active** sensor | Unavailable | Works |
+| **Busy** sensor | Unavailable | Works |
 | Everything else | Works | Works |
 
 Speed is the difference you'll actually notice. Without MQTT, Home Assistant asks the
@@ -83,7 +83,7 @@ After the piano restarts and connects, go to **Settings → Devices & services**
 discovered** card appears. Click **Configure**.
 
 **If you already added it by IP address,** nothing new appears — the integration picks up
-MQTT on its own. To confirm it worked, start a song and watch the **Keys active** sensor:
+MQTT on its own. To confirm it worked, start a song and watch the **Busy** sensor:
 it should turn on as the piano begins playing, instead of staying unavailable.
 
 ## Add the IP address too, if you set it up by discovery
