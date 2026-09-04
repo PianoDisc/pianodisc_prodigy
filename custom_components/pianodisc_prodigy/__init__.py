@@ -6,13 +6,12 @@ from pathlib import Path
 
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.components import mqtt
-from homeassistant.components.frontend import async_remove_panel
-from homeassistant.components.lovelace.const import (
-    CONF_RESOURCE_TYPE_WS,
-    LOVELACE_DATA,
-    MODE_STORAGE,
+from homeassistant.components.frontend import (
+    DATA_EXTRA_MODULE_URL,
+    add_extra_js_url,
+    async_remove_panel,
+    remove_extra_js_url,
 )
-from homeassistant.components.lovelace.resources import ResourceStorageCollection
 from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
@@ -51,7 +50,15 @@ PLATFORMS: list[Platform] = [
 
 # The macOS companion app keeps ES modules by URL. Bump this whenever either
 # Lovelace card changes so it cannot revive an old custom-element definition.
-_CARD_RESOURCE_REVISION = "2"
+_CARD_RESOURCE_REVISION = "3"
+
+
+def _card_module_urls() -> tuple[str, str]:
+    """Versioned Lovelace card module URLs served by this integration."""
+    return (
+        f"/{DOMAIN}/playlist-panel.js?v={_CARD_RESOURCE_REVISION}",
+        f"/{DOMAIN}/library-card.js?v={_CARD_RESOURCE_REVISION}",
+    )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> bool:
@@ -85,13 +92,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) ->
 
 
 async def _async_register_frontend(hass: HomeAssistant) -> None:
-    """Register the playlist editor as a Lovelace custom-card resource."""
+    """Serve and register the integration's Lovelace card modules."""
     data = hass.data.setdefault(DOMAIN, {})
     frontend_dir = Path(__file__).with_name("frontend")
-    module_urls = (
-        f"/{DOMAIN}/playlist-panel.js?v={_CARD_RESOURCE_REVISION}",
-        f"/{DOMAIN}/library-card.js?v={_CARD_RESOURCE_REVISION}",
-    )
+    module_urls = _card_module_urls()
     # v0.1.3 exposed global panels. Remove them on upgrade/reload so the old sidebar
     # entries do not linger after the editor becomes a dashboard card.
     for legacy_panel in (
@@ -101,14 +105,15 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
     ):
         async_remove_panel(hass, legacy_panel, warn_if_unknown=False)
     if data.get("frontend_registered"):
-        # An integration reload can happen in the same HA process that previously ran
-        # the old sidebar implementation. The static route is already present, but the
-        # new Lovelace resource still needs to be created.
+        hass.data.setdefault(DATA_EXTRA_MODULE_URL, set())
         for module_url in module_urls:
-            await _async_register_lovelace_resource(hass, module_url)
+            add_extra_js_url(hass, module_url)
         return
     await async_setup_component(hass, "http", {})
     await async_setup_component(hass, "frontend", {})
+    hass.data.setdefault(DATA_EXTRA_MODULE_URL, set())
+    for module_url in module_urls:
+        add_extra_js_url(hass, module_url)
     async_register_websocket_api(hass)
     await hass.http.async_register_static_paths(
         [
@@ -129,52 +134,45 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
             )
         ]
     )
-    for module_url in module_urls:
-        await _async_register_lovelace_resource(hass, module_url)
     data["frontend_registered"] = True
 
 
-async def _async_register_lovelace_resource(hass: HomeAssistant, module_url: str) -> None:
-    """Make the card module a first-class Lovelace resource when storage mode is used.
-
-    ``add_extra_js_url`` helps on a full browser reload, but a storage-mode Lovelace
-    resource additionally notifies already-open dashboards to load the module.
-    """
-    lovelace_data = hass.data.get(LOVELACE_DATA)
-    if lovelace_data is None or lovelace_data.resource_mode != MODE_STORAGE:
+async def _async_cleanup_legacy_lovelace_resources(hass: HomeAssistant) -> None:
+    """Best-effort cleanup for tester installs that wrote dashboard resources."""
+    lovelace_data = hass.data.get("lovelace")
+    resources = getattr(lovelace_data, "resources", None)
+    async_items = getattr(resources, "async_items", None)
+    async_delete_item = getattr(resources, "async_delete_item", None)
+    if not callable(async_items) or not callable(async_delete_item):
         return
-    resources = lovelace_data.resources
-    if not isinstance(resources, ResourceStorageCollection):
+    try:
+        items = list(async_items())
+    except (AttributeError, TypeError):
         return
-    if not resources.loaded:
-        await resources.async_load()
-        resources.loaded = True
-    base_url = module_url.partition("?")[0]
-    matching = [
-        item
-        for item in resources.async_items()
-        if item.get("url", "").partition("?")[0] == base_url
-    ]
-    if any(item.get("url") == module_url for item in matching):
-        return
-    if matching:
-        await resources.async_update_item(
-            matching[0]["id"],
-            {"url": module_url, CONF_RESOURCE_TYPE_WS: "module"},
-        )
-        for duplicate in matching[1:]:
-            await resources.async_delete_item(duplicate["id"])
-        return
-    await resources.async_create_item(
-        {"url": module_url, CONF_RESOURCE_TYPE_WS: "module"}
-    )
+    for item in items:
+        url = item.get("url") if isinstance(item, dict) else None
+        item_id = item.get("id") if isinstance(item, dict) else None
+        if not url or item_id is None:
+            continue
+        if url.startswith(f"/{DOMAIN}/"):
+            try:
+                await async_delete_item(item_id)
+            except (AttributeError, TypeError, ValueError, KeyError):
+                LOGGER.debug("Could not remove legacy Lovelace resource %s", url)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> bool:
     """Unload a config entry."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
-        hass.data.get(DOMAIN, {}).get(DATA_COORDINATORS, {}).pop(entry.entry_id, None)
+        coordinators = hass.data.get(DOMAIN, {}).get(DATA_COORDINATORS, {})
+        coordinators.pop(entry.entry_id, None)
+        if not coordinators:
+            module_urls = hass.data.setdefault(DATA_EXTRA_MODULE_URL, set())
+            for module_url in _card_module_urls():
+                if module_url in module_urls:
+                    remove_extra_js_url(hass, module_url)
+            await _async_cleanup_legacy_lovelace_resources(hass)
     return unloaded
 
 

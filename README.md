@@ -133,6 +133,16 @@ type: custom:pianodisc-playlist-card
 entity: media_player.living_room_piano
 ```
 
+For a searchable song launcher, add the **PianoDisc Library** custom card:
+
+```yaml
+type: custom:pianodisc-library-card
+entity: media_player.living_room_piano
+```
+
+After installing or upgrading the integration, reload the browser page before adding these
+cards from the card picker.
+
 Add the four **AutoPlay** entities to an Entities card alongside it. They are ordinary
 configuration entities, so they can also be used directly in automations and voice control.
 
