@@ -1,3 +1,13 @@
+function findSinglePianoDiscMediaPlayer(hass) {
+  const entities = Object.entries(hass?.states || {})
+    .filter(([entityId, state]) =>
+      entityId.startsWith("media_player.") &&
+      state.attributes?.icon === "mdi:piano"
+    )
+    .map(([entityId]) => entityId);
+  return entities.length === 1 ? entities[0] : undefined;
+}
+
 class PianoDiscLibraryCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
@@ -26,8 +36,11 @@ class PianoDiscLibraryCard extends HTMLElement {
     return document.createElement("pianodisc-library-card-editor");
   }
 
-  static getStubConfig() {
-    return { type: "custom:pianodisc-library-card" };
+  static getStubConfig(hass) {
+    const entity = findSinglePianoDiscMediaPlayer(hass);
+    return entity
+      ? { type: "custom:pianodisc-library-card", entity }
+      : { type: "custom:pianodisc-library-card" };
   }
 
   constructor() {
@@ -82,22 +95,12 @@ class PianoDiscLibraryCard extends HTMLElement {
     }
   }
 
-  _render() {
-    if (!this._entityId) {
-      this.shadowRoot.innerHTML = `
-        <style>
-          :host { display: block; }
-          .empty { padding: 24px; color: var(--secondary-text-color); text-align: center; }
-        </style>
-        <ha-card><div class="empty">Select a Piano media player in the card configuration.</div></ha-card>
-      `;
-      return;
-    }
+  _songsTemplate() {
     const query = this._query.toLocaleLowerCase().trim();
     const songs = this._songs.filter((song) =>
       !query || song.title.toLocaleLowerCase().includes(query)
     );
-    const body = this._loading
+    return this._loading
       ? '<div class="empty">Loading library...</div>'
       : this._error
         ? `<div class="error">${this._escape(this._error)}</div>`
@@ -108,6 +111,35 @@ class PianoDiscLibraryCard extends HTMLElement {
                 <span>${this._escape(song.title)}</span>
               </button>`).join("")
           : '<div class="empty">No matching songs.</div>';
+  }
+
+  _renderSongs() {
+    const songs = this.shadowRoot.querySelector(".songs");
+    if (!songs) return;
+    songs.innerHTML = this._songsTemplate();
+    this._bindSongEvents(songs);
+  }
+
+  _bindSongEvents(root = this.shadowRoot) {
+    root.querySelectorAll(".song").forEach((button) =>
+      button.addEventListener("click", () => {
+        const song = this._songs.find((item) => item.media_content_id === button.dataset.id);
+        if (song) this._play(song);
+      })
+    );
+  }
+
+  _render() {
+    if (!this._entityId) {
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host { display: block; }
+          .empty { padding: 24px; color: var(--secondary-text-color); text-align: center; }
+        </style>
+        <ha-card><div class="empty">Choose the piano this card controls.</div></ha-card>
+      `;
+      return;
+    }
     this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; }
@@ -126,19 +158,14 @@ class PianoDiscLibraryCard extends HTMLElement {
       <ha-card><div class="page">
         <header><h2>Piano Library</h2><button class="icon" title="Reload song list" data-action="refresh"><ha-icon icon="mdi:refresh"></ha-icon></button></header>
         <input type="search" placeholder="Search songs" value="${this._escapeAttr(this._query)}" ${this._loading ? "disabled" : ""}>
-        <div class="songs">${body}</div>
+        <div class="songs">${this._songsTemplate()}</div>
       </div></ha-card>`;
     this.shadowRoot.querySelector("input")?.addEventListener("input", (event) => {
       this._query = event.target.value;
-      this._render();
+      this._renderSongs();
     });
     this.shadowRoot.querySelector("[data-action='refresh']")?.addEventListener("click", () => this._load());
-    this.shadowRoot.querySelectorAll(".song").forEach((button) =>
-      button.addEventListener("click", () => {
-        const song = this._songs.find((item) => item.media_content_id === button.dataset.id);
-        if (song) this._play(song);
-      })
-    );
+    this._bindSongEvents();
   }
 
   _escape(value) { return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }
@@ -146,22 +173,48 @@ class PianoDiscLibraryCard extends HTMLElement {
 }
 
 class PianoDiscLibraryCardEditor extends HTMLElement {
-  constructor() { super(); this.attachShadow({ mode: "open" }); this._config = {}; }
-  set hass(hass) { this._hass = hass; this._render(); }
-  setConfig(config) { this._config = { ...config }; this._render(); }
-  _render() {
-    if (!this._hass) return;
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+    this._config = {};
+    this._form = null;
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._ensureForm();
+    this._syncForm();
+  }
+
+  setConfig(config) {
+    this._config = { ...config };
+    this._syncForm();
+  }
+
+  _ensureForm() {
+    if (this._form) return;
     this.shadowRoot.innerHTML = "<ha-form></ha-form>";
-    const form = this.shadowRoot.querySelector("ha-form");
-    form.hass = this._hass;
-    form.data = { entity: this._config.entity || "" };
-    form.schema = [{ name: "entity", selector: { entity: { domain: "media_player" } } }];
-    form.computeLabel = () => "Piano media player";
-    form.addEventListener("value-changed", (event) => {
-      const config = { ...this._config, ...event.detail.value };
+    this._form = this.shadowRoot.querySelector("ha-form");
+    this._form.schema = [{ name: "entity", selector: { entity: { domain: "media_player" } } }];
+    this._form.computeLabel = () => "Piano media player";
+    this._form.addEventListener("value-changed", (event) => {
+      const entity = event.detail.value.entity;
+      const config = { ...this._config };
+      if (entity) {
+        config.entity = entity;
+      } else {
+        delete config.entity;
+      }
       this._config = config;
       this.dispatchEvent(new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }));
     });
+  }
+
+  _syncForm() {
+    if (!this._hass || !this._form) return;
+    const form = this._form;
+    form.hass = this._hass;
+    form.data = { entity: this._config.entity || "" };
   }
 }
 

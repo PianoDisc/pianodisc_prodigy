@@ -1,3 +1,13 @@
+function findSinglePianoDiscMediaPlayer(hass) {
+  const entities = Object.entries(hass?.states || {})
+    .filter(([entityId, state]) =>
+      entityId.startsWith("media_player.") &&
+      state.attributes?.icon === "mdi:piano"
+    )
+    .map(([entityId]) => entityId);
+  return entities.length === 1 ? entities[0] : undefined;
+}
+
 class PianoDiscPlaylistCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
@@ -32,8 +42,11 @@ class PianoDiscPlaylistCard extends HTMLElement {
     return document.createElement("pianodisc-playlist-card-editor");
   }
 
-  static getStubConfig() {
-    return { type: "custom:pianodisc-playlist-card" };
+  static getStubConfig(hass) {
+    const entity = findSinglePianoDiscMediaPlayer(hass);
+    return entity
+      ? { type: "custom:pianodisc-playlist-card", entity }
+      : { type: "custom:pianodisc-playlist-card" };
   }
 
   constructor() {
@@ -280,6 +293,20 @@ class PianoDiscPlaylistCard extends HTMLElement {
   }
 
   _render() {
+    if (!this._entityId) {
+      this.shadowRoot.innerHTML = `
+      <style>
+        :host { display: block; color: var(--primary-text-color); }
+        .empty {
+          color: var(--secondary-text-color);
+          padding: 24px;
+          text-align: center;
+        }
+      </style>
+      <ha-card><div class="empty">Choose the piano this card controls.</div></ha-card>
+    `;
+      return;
+    }
     const playlist = this._playlists[this._selected];
     const libraryReady = this._libraryStatus === "ready";
     const busy = this._loading || this._saving || !libraryReady;
@@ -732,7 +759,7 @@ class PianoDiscPlaylistCard extends HTMLElement {
           <input class="search" data-action="search" placeholder="Search library" value="${this._escapeAttr(
             this._query
           )}" ${disabled}>
-          <div class="song-list">
+          <div class="song-list available-songs">
             ${this._availableSongsTemplate(playlist)}
           </div>
         </section>
@@ -803,6 +830,22 @@ class PianoDiscPlaylistCard extends HTMLElement {
       .join("");
   }
 
+  _refreshAvailableSongs() {
+    const playlist = this._playlists[this._selected];
+    const songs = this.shadowRoot.querySelector(".available-songs");
+    if (!playlist || !songs) return;
+    songs.innerHTML = this._availableSongsTemplate(playlist);
+    this._bindAvailableSongEvents(songs);
+  }
+
+  _bindAvailableSongEvents(root = this.shadowRoot) {
+    root.querySelectorAll("[data-action='add-song']").forEach((button) =>
+      button.addEventListener("click", () =>
+        this._addSong(button.dataset.path, button.dataset.list)
+      )
+    );
+  }
+
   _bindEvents() {
     this.shadowRoot
       .querySelector("[data-action='add-playlist']")
@@ -836,7 +879,7 @@ class PianoDiscPlaylistCard extends HTMLElement {
       .querySelector("[data-action='search']")
       ?.addEventListener("input", (ev) => {
         this._query = ev.target.value;
-        this._render();
+        this._refreshAvailableSongs();
       });
     this.shadowRoot.querySelectorAll("[data-action='select']").forEach((button) =>
       button.addEventListener("click", () =>
@@ -848,11 +891,7 @@ class PianoDiscPlaylistCard extends HTMLElement {
         this._playPlaylist(Number(button.dataset.index))
       )
     );
-    this.shadowRoot.querySelectorAll("[data-action='add-song']").forEach((button) =>
-      button.addEventListener("click", () =>
-        this._addSong(button.dataset.path, button.dataset.list)
-      )
-    );
+    this._bindAvailableSongEvents();
     this.shadowRoot
       .querySelectorAll("[data-action='remove-song']")
       .forEach((button) =>
@@ -879,21 +918,22 @@ class PianoDiscPlaylistCardEditor extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this._config = {};
+    this._form = null;
   }
 
   set hass(hass) {
     this._hass = hass;
-    this._render();
+    this._ensureForm();
+    this._syncForm();
   }
 
   setConfig(config) {
     this._config = { ...config };
-    this._render();
+    this._syncForm();
   }
 
-  _render() {
-    if (!this._hass) return;
-
+  _ensureForm() {
+    if (this._form) return;
     this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; }
@@ -902,18 +942,16 @@ class PianoDiscPlaylistCardEditor extends HTMLElement {
       <ha-form></ha-form>
     `;
 
-    const form = this.shadowRoot.querySelector("ha-form");
-    form.hass = this._hass;
-    form.data = { entity: this._config.entity || "" };
-    form.schema = [
+    this._form = this.shadowRoot.querySelector("ha-form");
+    this._form.schema = [
       {
         name: "entity",
         selector: { entity: { domain: "media_player" } },
       },
     ];
-    form.computeLabel = (schema) =>
+    this._form.computeLabel = (schema) =>
       schema.name === "entity" ? "Piano media player" : schema.name;
-    form.addEventListener("value-changed", (event) => {
+    this._form.addEventListener("value-changed", (event) => {
       const entity = event.detail.value.entity;
       const config = { ...this._config };
       if (entity) {
@@ -930,6 +968,12 @@ class PianoDiscPlaylistCardEditor extends HTMLElement {
         })
       );
     });
+  }
+
+  _syncForm() {
+    if (!this._hass || !this._form) return;
+    this._form.hass = this._hass;
+    this._form.data = { entity: this._config.entity || "" };
   }
 }
 
