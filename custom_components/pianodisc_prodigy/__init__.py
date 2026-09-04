@@ -50,7 +50,7 @@ PLATFORMS: list[Platform] = [
 
 # The macOS companion app keeps ES modules by URL. Bump this whenever either
 # Lovelace card changes so it cannot revive an old custom-element definition.
-_CARD_RESOURCE_REVISION = "3"
+_CARD_RESOURCE_REVISION = "4"
 
 
 def _card_module_urls() -> tuple[str, str]:
