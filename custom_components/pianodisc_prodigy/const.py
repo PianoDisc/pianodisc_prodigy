@@ -104,6 +104,10 @@ SONGLIST_TTL: Final = 21600  # 6h backstop; Refresh-library button forces a re-s
 DEBUG_KEY_DEVICE_ID: Final = "Device ID"
 DEBUG_KEY_AUDIO_VERSION: Final = "Audio Version"
 DEBUG_KEY_MIDI_VERSION: Final = "MIDI Version"
+DEBUG_KEY_SERIAL_NUMBER: Final = "Serial Number"
+DEBUG_KEY_WIFI_RSSI: Final = "Wi-Fi RSSI"
+DEBUG_KEY_WIFI_SSID: Final = "Wi-Fi SSID"
+DEBUG_KEY_BLUETOOTH_NAME: Final = "Bluetooth Name"
 
 # Volume scaling: device speaks 1..100 (SD playback / solenoid force), HA speaks 0..1.
 # 0 is the mute volume; normal non-muted playback is 1..100.

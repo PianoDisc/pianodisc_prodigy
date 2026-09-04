@@ -41,7 +41,11 @@ from .const import (
     MAX_MSC_CHANNELS,
     MODEL,
 )
-from .coordinator import PianoDiscConfigEntry, PianoDiscCoordinator
+from .coordinator import (
+    PianoDiscConfigEntry,
+    PianoDiscCoordinator,
+    _format_device_sw_version,
+)
 from .transports import Transport
 from .transports.http import HttpTransport
 from .transports.mqtt import MqttTransport
@@ -289,7 +293,16 @@ def _async_sync_msc_registry(
         connections=connections,
         manufacturer=MANUFACTURER,
         model=MODEL,
+        model_id=device_id,
         name=coordinator.data.device_name or entry.title,
+        serial_number=coordinator.data.serial_number,
+        hw_version=coordinator.data.hardware_version,
+        sw_version=_format_device_sw_version(coordinator.data),
+        configuration_url=(
+            f"http://{coordinator.data.ip_address}"
+            if coordinator.data.ip_address
+            else None
+        ),
     )
     device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,

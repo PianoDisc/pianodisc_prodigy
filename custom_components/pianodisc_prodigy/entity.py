@@ -37,7 +37,10 @@ class PianoDiscEntity(CoordinatorEntity[PianoDiscCoordinator]):
             connections=connections,
             manufacturer=MANUFACTURER,
             model=MODEL,
+            model_id=device_id,
             name=coordinator.data.device_name or entry.title,
+            serial_number=coordinator.data.serial_number,
+            hw_version=coordinator.data.hardware_version,
             sw_version=self._format_sw_version(),
             configuration_url=self._configuration_url(),
         )

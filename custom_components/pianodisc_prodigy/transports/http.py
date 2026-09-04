@@ -20,8 +20,12 @@ from homeassistant.util import dt as dt_util
 
 from ..const import (
     DEBUG_KEY_AUDIO_VERSION,
+    DEBUG_KEY_BLUETOOTH_NAME,
     DEBUG_KEY_DEVICE_ID,
     DEBUG_KEY_MIDI_VERSION,
+    DEBUG_KEY_SERIAL_NUMBER,
+    DEBUG_KEY_WIFI_RSSI,
+    DEBUG_KEY_WIFI_SSID,
     HTTP_REQUEST_TIMEOUT,
     HTTP_SOCKET_LIMIT,
     MAX_SCAN_PAGES,
@@ -137,7 +141,7 @@ class HttpTransport(Transport):
             return None
 
     # -- identity / probe ---------------------------------------------------
-    async def async_get_device_info(self) -> dict[str, str] | None:
+    async def async_get_device_info(self) -> dict[str, Any] | None:
         """deviceID + firmware versions from /debugJson (the only HTTP source)."""
         debug = await self._get_json("debugJson?type=request")
         if not isinstance(debug, dict):
@@ -149,6 +153,11 @@ class HttpTransport(Transport):
             "device_id": str(device_id),
             "audio_version": _as_str(debug.get(DEBUG_KEY_AUDIO_VERSION)),
             "midi_version": _as_str(debug.get(DEBUG_KEY_MIDI_VERSION)),
+            "serial_number": _as_str(debug.get(DEBUG_KEY_SERIAL_NUMBER)),
+            "hardware_version": _hardware_version(debug),
+            "wifi_rssi": _as_int(debug.get(DEBUG_KEY_WIFI_RSSI)),
+            "wifi_ssid": _as_str(debug.get(DEBUG_KEY_WIFI_SSID)),
+            "bluetooth_name": _as_str(debug.get(DEBUG_KEY_BLUETOOTH_NAME)),
         }
 
     async def async_fetch_debug_json(self) -> dict[str, Any] | None:
@@ -264,6 +273,11 @@ class HttpTransport(Transport):
             data = data.merge(
                 firmware_audio=_as_str(debug.get(DEBUG_KEY_AUDIO_VERSION)),
                 firmware_midi=_as_str(debug.get(DEBUG_KEY_MIDI_VERSION)),
+                serial_number=_as_str(debug.get(DEBUG_KEY_SERIAL_NUMBER)),
+                hardware_version=_hardware_version(debug),
+                wifi_rssi=_as_int(debug.get(DEBUG_KEY_WIFI_RSSI)),
+                wifi_ssid=_as_str(debug.get(DEBUG_KEY_WIFI_SSID)),
+                bluetooth_name=_as_str(debug.get(DEBUG_KEY_BLUETOOTH_NAME)),
             )
         return data
 
@@ -490,6 +504,29 @@ class HttpTransport(Transport):
 
 def _as_str(value: Any) -> str | None:
     return str(value) if value not in (None, "") else None
+
+
+def _as_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def _hardware_version(debug: dict[str, Any]) -> str | None:
+    for key in ("Hardware Version", "HW Version", "hw_version"):
+        value = _as_str(debug.get(key))
+        if value is not None:
+            return value
+    return None
 
 
 def _songlist_key(data: object) -> tuple[str, ...] | None:

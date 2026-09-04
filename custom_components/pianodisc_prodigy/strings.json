@@ -85,6 +85,13 @@
         "state_attributes": {
           "scanning": { "name": "Scanning" }
         }
+      },
+      "wifi_signal": {
+        "name": "Wi-Fi signal",
+        "state_attributes": {
+          "ssid": { "name": "SSID" },
+          "bluetooth_name": { "name": "Bluetooth name" }
+        }
       }
     },
     "button": {

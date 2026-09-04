@@ -32,6 +32,8 @@ The setup screen says it couldn't connect, or the entities show as unavailable.
 - **Can you open it in a browser?** Visit `http://<piano-ip-address>` from the same
   network. If that doesn't load, the problem is between your network and the piano, not in
   Home Assistant.
+- **Does it drop offline intermittently?** Enable the disabled-by-default **Wi-Fi signal**
+  diagnostic entity on the piano device and check its RSSI history.
 - **Does the piano's address read `192.168.4.1`?** That means its Wi-Fi isn't configured
   and it's serving its own setup network. Connect it to your Wi-Fi first — see the
   [Prodigy II Guide](https://pianodisc.com/support/prodigy2-guide/).
