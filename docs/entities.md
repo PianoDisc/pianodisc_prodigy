@@ -52,7 +52,7 @@ Unavailable when the piano hasn't reported any playlists — either because it's
 because there are none yet. Create playlists from the **Piano Playlists** sidebar panel;
 see [SD card, MIDI files and playlists](sd-card.md).
 
-## Piano active (binary sensor)
+## Busy (binary sensor)
 
 On while the player system is playing — that is, while the piano is driving its own keys.
 
@@ -99,7 +99,7 @@ as it goes.
 
 *Diagnostic entity — hidden from dashboards by default.*
 
-## Readiness (sensor)
+## Status (sensor)
 
 Whether the piano has finished its startup work and is safe to play.
 
@@ -196,5 +196,5 @@ A piano is not a device that stays on. **Unavailable usually means "powered off"
 "broken"** — that's expected and not an error.
 
 The exceptions are the entities that deliberately stay available because they report
-cached information rather than live state: **Library**, **Readiness**, **Audio firmware**
+cached information rather than live state: **Library**, **Status**, **Audio firmware**
 and **MIDI firmware**.

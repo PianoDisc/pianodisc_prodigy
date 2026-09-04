@@ -38,7 +38,7 @@ rules:
 
   # Gold
   entity-translations: done
-  entity-device-class: todo  # busy -> RUNNING when the binary_sensor lands
+  entity-device-class: done
   devices: done
   entity-category: todo  # diagnostic categories on reboot/firmware entities
   entity-disabled-by-default: todo

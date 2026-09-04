@@ -1,7 +1,7 @@
 # Automation examples
 
 Working examples to copy and adapt. Entity IDs vary by installation — replace
-`media_player.piano`, `binary_sensor.piano_keys_active` and the rest with your own.
+`media_player.piano`, `binary_sensor.piano_busy` and the rest with your own.
 
 > Every one of these makes an acoustic piano play out loud. Try new automations at a time
 > and volume that suit the room.
@@ -79,7 +79,7 @@ if you haven't set that up.
 
 ## Set the scene while the piano is playing
 
-**Keys active** follows the player system directly, so it turns on the moment a song
+**Busy** follows the player system directly, so it turns on the moment a song
 starts and off when it ends — a quicker trigger than waiting for the media player's state
 to catch up.
 
@@ -87,7 +87,7 @@ to catch up.
 alias: Piano lighting
 triggers:
   - trigger: state
-    entity_id: binary_sensor.piano_keys_active
+    entity_id: binary_sensor.piano_busy
     to: "on"
 actions:
   - action: light.turn_on
@@ -164,7 +164,7 @@ actions:
       entity_id: media_player.piano
   - wait_for_trigger:
       - trigger: state
-        entity_id: sensor.piano_readiness
+        entity_id: sensor.piano_status
         to: "READY"
     timeout: "00:02:00"
     continue_on_timeout: false
@@ -305,5 +305,5 @@ whose only stop control is a voice command that has to compete with the piano.
 > auto-play and hands control to the app. That's a way to take over the piano, not a
 > general-purpose stop.
 >
-> Music playing from the iQ App does turn **Keys active** on, so automations that react to
+> Music playing from the iQ App does turn **Busy** on, so automations that react to
 > the piano playing will still fire — but Home Assistant won't know the song title.
