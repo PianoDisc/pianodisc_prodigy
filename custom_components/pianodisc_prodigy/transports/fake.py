@@ -100,6 +100,15 @@ class FakeTransport(Transport):
     async def async_fetch_snapshot(self) -> ProdigyData:
         return self._data
 
+    async def async_fetch_debug_json(self) -> dict[str, object]:
+        return {
+            "Device ID": "DEFAEE5C894F",
+            "Name": self._data.device_name,
+            "Audio Version": self._data.firmware_audio,
+            "MIDI Version": self._data.firmware_midi,
+            "Ready State": self._data.readiness,
+        }
+
     # -- helpers ------------------------------------------------------------
     def _update(self, **changes: object) -> None:
         self._data = self._data.merge(**changes)

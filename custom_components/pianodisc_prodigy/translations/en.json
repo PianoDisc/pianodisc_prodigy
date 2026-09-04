@@ -68,6 +68,10 @@
           "description": "Restore the previous volume once the song has been started."
         }
       }
+    },
+    "get_debug_info": {
+      "name": "Get debug info",
+      "description": "Fetch the piano's current debug JSON and return it to an automation."
     }
   },
   "entity": {
@@ -111,6 +115,12 @@
     },
     "playlist_not_found": {
       "message": "No playlist matching '{playlist}' was found on the piano."
+    },
+    "debug_info_target": {
+      "message": "Choose exactly one PianoDisc media player."
+    },
+    "debug_info_unavailable": {
+      "message": "The piano did not return debug information."
     }
   }
 }

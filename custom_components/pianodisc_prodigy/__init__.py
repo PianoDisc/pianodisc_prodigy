@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
-from homeassistant.components.http import StaticPathConfig
+import voluptuous as vol
+
 from homeassistant.components import mqtt
 from homeassistant.components.frontend import (
     DATA_EXTRA_MODULE_URL,
@@ -12,12 +14,20 @@ from homeassistant.components.frontend import (
     async_remove_panel,
     remove_extra_js_url,
 )
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.const import CONF_HOST, Platform
-from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers import entity_registry as er
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+    ServiceResponse,
+    SupportsResponse,
+)
+from homeassistant.exceptions import ConfigEntryNotReady, ServiceValidationError
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import target as target_helpers
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 from homeassistant.setup import async_setup_component
 
@@ -48,6 +58,8 @@ PLATFORMS: list[Platform] = [
     Platform.EVENT,
 ]
 
+SERVICE_GET_DEBUG_INFO = "get_debug_info"
+
 # The macOS companion app keeps ES modules by URL. Bump this whenever either
 # Lovelace card changes so it cannot revive an old custom-element definition.
 _CARD_RESOURCE_REVISION = "4"
@@ -59,6 +71,54 @@ def _card_module_urls() -> tuple[str, str]:
         f"/{DOMAIN}/playlist-panel.js?v={_CARD_RESOURCE_REVISION}",
         f"/{DOMAIN}/library-card.js?v={_CARD_RESOURCE_REVISION}",
     )
+
+
+async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
+    """Set up integration-wide PianoDisc services."""
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_DEBUG_INFO,
+        _async_get_debug_info,
+        schema=vol.Schema(cv.TARGET_SERVICE_FIELDS),
+        supports_response=SupportsResponse.ONLY,
+    )
+    return True
+
+
+async def _async_get_debug_info(call: ServiceCall) -> ServiceResponse:
+    """Fetch and return the target piano's current debugJson payload."""
+    hass = call.hass
+    selected = target_helpers.async_extract_referenced_entity_ids(
+        hass, target_helpers.TargetSelection(call.data)
+    )
+    entity_ids = selected.referenced | selected.indirectly_referenced
+    registry = er.async_get(hass)
+    coordinators = hass.data.get(DOMAIN, {}).get(DATA_COORDINATORS, {})
+    matches: dict[str, PianoDiscCoordinator] = {}
+
+    for entity_id in entity_ids:
+        if entity_id.split(".", 1)[0] != Platform.MEDIA_PLAYER.value:
+            continue
+        entity = registry.async_get(entity_id)
+        if entity is None or entity.platform != DOMAIN or entity.config_entry_id is None:
+            continue
+        coordinator = coordinators.get(entity.config_entry_id)
+        if coordinator is not None:
+            matches[entity.config_entry_id] = coordinator
+
+    if len(matches) != 1:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="debug_info_target",
+        )
+
+    debug_info = await next(iter(matches.values())).transport.async_fetch_debug_json()
+    if not isinstance(debug_info, dict):
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="debug_info_unavailable",
+        )
+    return debug_info
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> bool:
