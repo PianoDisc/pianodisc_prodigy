@@ -138,8 +138,8 @@ POWER_OFF_SETTLE: Final = 1.0  # seconds between the graceful Stop and cutting p
 # burst so the per-note flapping doesn't bounce the state (verified live 2026-06-08).
 BUSY_DEBOUNCE: Final = 10.0  # seconds
 
-# After a Stop, hold PLAYING at most this long and let …/busy verify the result: if keys
-# keep striking the command was missed (stay PLAYING so the user can retry), else IDLE.
+# After a Stop, hold IDLE at least this long while delayed busy/playerStatus messages
+# settle, so HA does not briefly flip back to playing after a user-requested stop.
 STOP_CONFIRM: Final = 5.0  # seconds
 
 # A stop/end snapshot can briefly resemble an inter-song gap. A new PLAYING snapshot

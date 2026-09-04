@@ -177,7 +177,7 @@ class MqttTransport(Transport):
         # State inputs. The displayed state is derived from these (see _derive_state).
         self._http_state: MediaPlayerState | None = None  # last /playerStatus state
         self._busy_until = 0.0  # busy counts as "playing" until this loop time
-        self._stopped = False  # only used before playback is known
+        self._stopped = False  # user/device stop hold while delayed status settles
         self._paused = False
         self._playing = False
         self._playback_seen = False
@@ -189,6 +189,7 @@ class MqttTransport(Transport):
         self._shuffle_hold_until = 0.0
         # After a (re)play, suppress this stale title until a new one appears.
         self._prev_song: str | None = None
+        self._last_song_path: str | None = None
         self._last_status_song: str | None = None
         self._pending_song_change = False
         self._song_grace_until = 0.0
@@ -385,13 +386,13 @@ class MqttTransport(Transport):
             if state in (MediaPlayerState.PLAYING, MediaPlayerState.PAUSED):
                 self._playback_seen = True
             if stop_after_playback:
-                self._paused = True
+                self._paused = False
                 self._playing = False
                 self._busy_until = 0.0
                 if self._cancel_busy is not None:
                     self._cancel_busy()
                     self._cancel_busy = None
-                self._stopped = False
+                self._stopped = True
             elif state is not MediaPlayerState.PLAYING:
                 self._paused = state is MediaPlayerState.PAUSED
                 self._playing = False
@@ -402,10 +403,13 @@ class MqttTransport(Transport):
             else:
                 self._paused = False
                 self._playing = True
-            if state is MediaPlayerState.IDLE:
+                self._stopped = False
+            if state is MediaPlayerState.IDLE and not stop_after_playback:
                 self._stopped = False
 
         if stop_after_playback:
+            if song_path is not None:
+                self._last_song_path = song_path
             self._mqtt_status_seen = True
             self._push(
                 available=self._avail(msg),
@@ -420,6 +424,8 @@ class MqttTransport(Transport):
 
         display_song = self._status_song_for_display(song)
         display_song_path = song_path if display_song is not None else None
+        if display_song_path is not None:
+            self._last_song_path = display_song_path
         position = _non_negative_number(payload.get("position"))
         position_updated_at = dt_util.utcnow() if position is not None else None
         if position is None and display_song is not None:
@@ -690,6 +696,7 @@ class MqttTransport(Transport):
     def _optimistic_new_song(self) -> None:
         """On play/next/prev: optimistically PLAYING + clear the now-stale title."""
         self._stopped = False
+        self._paused = False
         self._busy_until = self._hass.loop.time() + BUSY_DEBOUNCE
         self._suppress_current_title()
 
@@ -722,16 +729,16 @@ class MqttTransport(Transport):
     def _derive_state(self) -> MediaPlayerState | None:
         if self._paused:
             return MediaPlayerState.PAUSED
-        # Solenoid activity is the real-time truth unless a known Stop is being shown
-        # as PAUSED/Loading. Busy also covers boot before /playerStatus is responsive.
+        # A Stop requested by HA is a real idle state for HA. Keep that until the
+        # device confirms idle or a fresh play command intentionally releases it.
+        if self._stopped:
+            return MediaPlayerState.IDLE
+        # Solenoid activity is the real-time truth. Busy also covers boot before
+        # /playerStatus is responsive.
         if self._playing or self._busy_active():
             return MediaPlayerState.PLAYING
         if self._http_state is MediaPlayerState.PAUSED:
             return MediaPlayerState.PAUSED
-        # Before any playback is known, an issued Stop can still settle to true idle.
-        # After playback, Stop is represented by _paused so the media card stays alive.
-        if self._stopped:
-            return MediaPlayerState.IDLE
         # Otherwise the authoritative HTTP poll, or None until the piano answers.
         return self._http_state
 
@@ -758,6 +765,7 @@ class MqttTransport(Transport):
         self._shuffle_target = None
         self._shuffle_hold_until = 0.0
         self._prev_song = None
+        self._last_song_path = None
         self._last_status_song = None
         self._pending_song_change = False
         self._song_grace_until = 0.0
@@ -855,6 +863,13 @@ class MqttTransport(Transport):
         if index is None and self._data.state is MediaPlayerState.PAUSED:
             self._optimistic_resume()
         else:
+            if index is None and self._data.state is MediaPlayerState.IDLE:
+                path = self._data.song_path or self._last_song_path
+                if path is not None:
+                    await self.async_play_path(path)
+                    return
+            if index is not None:
+                self._last_song_path = None
             self._optimistic_new_song()
         command: dict = {"exec": "Play"}
         if index is not None and index >= 0:
@@ -868,6 +883,7 @@ class MqttTransport(Transport):
     async def async_play_path(self, path: str) -> None:
         """Ask the NRF to resolve a path against its current SD-card library."""
         self._playback_seen = True
+        self._last_song_path = path
         self._optimistic_new_song()
         if not self._mqtt_live and self._http is not None:
             await self._http.async_play_path(path)
@@ -884,16 +900,15 @@ class MqttTransport(Transport):
             await self._publish({"exec": "Pause"})
 
     async def async_stop(self) -> None:
+        if self._data.song_path is not None:
+            self._last_song_path = self._data.song_path
         if not self._mqtt_live and self._http is not None:
             await self._http.async_stop()
         else:
             await self._publish({"exec": "Stop"})
-        # Once playback has been seen, the device's Stop state is not HA "idle": keep
-        # the card in PAUSED/Loading so the next Play can resume the visible surface.
-        # On a cold/unknown stop, fall back to IDLE.
         self._stopped = True
         self._playing = False
-        self._paused = self._playback_seen
+        self._paused = False
         now = self._hass.loop.time()
         self._busy_until = min(self._busy_until, now + STOP_CONFIRM)
         if self._cancel_busy is not None:
@@ -904,6 +919,7 @@ class MqttTransport(Transport):
         self._push()
 
     async def async_next(self) -> None:
+        self._last_song_path = None
         self._optimistic_new_song()
         if not self._mqtt_live and self._http is not None:
             await self._http.async_next()
@@ -912,6 +928,7 @@ class MqttTransport(Transport):
         self._push()
 
     async def async_previous(self) -> None:
+        self._last_song_path = None
         self._optimistic_new_song()
         if not self._mqtt_live and self._http is not None:
             await self._http.async_previous()
@@ -1019,6 +1036,8 @@ class MqttTransport(Transport):
             if playback.state == MediaPlayerState.IDLE:
                 self._stopped = False  # device confirms idle → release the stop hold
             song = self._resolve_song(playback.song)
+            if song is not None and playback.song_path is not None:
+                self._last_song_path = playback.song_path
             # HTTP is authoritative whenever this piano is not live on MQTT. In
             # particular, it must replace an MQTT watchdog's stale OFFLINE with the
             # ESP's current WARMING_UP/READY state.

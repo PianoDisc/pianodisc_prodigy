@@ -103,6 +103,21 @@ class PianoDiscLibraryCard extends HTMLElement {
     }
   }
 
+  async _stop() {
+    if (this._configuredEntityMissing()) {
+      this._render();
+      return;
+    }
+    try {
+      await this._hass.callService("media_player", "media_stop", {
+        entity_id: this._entityId,
+      });
+    } catch (error) {
+      this._error = error?.message || "Unable to stop playback.";
+      this._render();
+    }
+  }
+
   _songsTemplate() {
     const query = this._query.toLocaleLowerCase().trim();
     const songs = this._songs.filter((song) =>
@@ -174,7 +189,11 @@ class PianoDiscLibraryCard extends HTMLElement {
         .error { color: var(--error-color); background: color-mix(in srgb, var(--error-color) 12%, transparent); }
       </style>
       <ha-card><div class="page">
-        <header><h2>Piano Library</h2><button class="icon" title="Reload song list" data-action="refresh"><ha-icon icon="mdi:refresh"></ha-icon></button></header>
+        <header>
+          <h2>Piano Library</h2>
+          <button class="icon" title="Stop playback" data-action="stop"><ha-icon icon="mdi:stop"></ha-icon></button>
+          <button class="icon" title="Reload song list" data-action="refresh"><ha-icon icon="mdi:refresh"></ha-icon></button>
+        </header>
         <input type="search" placeholder="Search songs" value="${this._escapeAttr(this._query)}" ${this._loading ? "disabled" : ""}>
         <div class="songs">${this._songsTemplate()}</div>
       </div></ha-card>`;
@@ -182,6 +201,7 @@ class PianoDiscLibraryCard extends HTMLElement {
       this._query = event.target.value;
       this._renderSongs();
     });
+    this.shadowRoot.querySelector("[data-action='stop']")?.addEventListener("click", () => this._stop());
     this.shadowRoot.querySelector("[data-action='refresh']")?.addEventListener("click", () => this._load());
     this._bindSongEvents();
   }

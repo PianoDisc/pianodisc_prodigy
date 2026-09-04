@@ -256,6 +256,18 @@ class PianoDiscPlaylistCard extends HTMLElement {
     });
   }
 
+  async _stopPlayback() {
+    if (!this._hass || !this._entityId) return;
+    try {
+      await this._hass.callService("media_player", "media_stop", {
+        entity_id: this._entityId,
+      });
+    } catch (error) {
+      this._error = error?.message || "Unable to stop playback.";
+      this._render();
+    }
+  }
+
   _titleForPath(path) {
     const match = this._songs.find((song) => song.path === path);
     if (match) return match.title;
@@ -333,6 +345,7 @@ class PianoDiscPlaylistCard extends HTMLElement {
     const libraryReady = this._libraryStatus === "ready";
     const busy = this._loading || this._saving || !libraryReady;
     const disabled = busy ? "disabled" : "";
+    const stopDisabled = this._entityId ? "" : "disabled";
     const startupMessage = this._libraryStatus === "preparing" ? "Preparing piano..." : "Syncing library...";
     const status = !libraryReady
       ? startupMessage
@@ -638,6 +651,9 @@ class PianoDiscPlaylistCard extends HTMLElement {
           <div class="toolbar">
             ${this._entitySelectTemplate()}
             <span class="status">${status}</span>
+            <button class="icon" title="Stop playback" data-action="stop" ${stopDisabled}>
+              <ha-icon icon="mdi:stop"></ha-icon>
+            </button>
             <button data-action="refresh" ${disabled}>Refresh</button>
             <button class="primary" data-action="save" ${saveDisabled}>Save</button>
           </div>
@@ -881,6 +897,9 @@ class PianoDiscPlaylistCard extends HTMLElement {
     this.shadowRoot
       .querySelector("[data-action='save']")
       ?.addEventListener("click", () => this._save());
+    this.shadowRoot
+      .querySelector("[data-action='stop']")
+      ?.addEventListener("click", () => this._stopPlayback());
     this.shadowRoot
       .querySelector("[data-action='entity']")
       ?.addEventListener("change", (ev) => {

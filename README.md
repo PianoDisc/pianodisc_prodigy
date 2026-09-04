@@ -124,6 +124,10 @@ Use the media-player card's **Browse media** action to browse the per-piano SD-c
 and playlists. Home Assistant's native browser keeps this tied to the selected piano and
 supports the integration's cached song search.
 
+Home Assistant's compact media controls may show Play/Pause without a visible Stop
+button. Add a Tile card with media playback controls if you want Stop available directly
+on the dashboard.
+
 For playlist editing, add the built-in **PianoDisc Playlists** custom card to any dashboard.
 When you have more than one piano, set `entity` to the media player for the piano this card
 should edit:
