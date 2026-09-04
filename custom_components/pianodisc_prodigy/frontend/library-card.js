@@ -57,9 +57,13 @@ class PianoDiscLibraryCard extends HTMLElement {
     return this._config.entity;
   }
 
+  _configuredEntityMissing() {
+    return Boolean(this._entityId && this._hass && !this._hass.states[this._entityId]);
+  }
+
   async _load() {
     if (!this._hass) return;
-    if (!this._entityId) {
+    if (!this._entityId || this._configuredEntityMissing()) {
       this._render();
       return;
     }
@@ -83,6 +87,10 @@ class PianoDiscLibraryCard extends HTMLElement {
   }
 
   async _play(song) {
+    if (this._configuredEntityMissing()) {
+      this._render();
+      return;
+    }
     try {
       await this._hass.callService("media_player", "play_media", {
         entity_id: this._entityId,
@@ -130,6 +138,16 @@ class PianoDiscLibraryCard extends HTMLElement {
   }
 
   _render() {
+    if (this._configuredEntityMissing()) {
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host { display: block; }
+          .empty { padding: 24px; color: var(--secondary-text-color); text-align: center; }
+        </style>
+        <ha-card><div class="empty">Choose an available PianoDisc media player.</div></ha-card>
+      `;
+      return;
+    }
     if (!this._entityId) {
       this.shadowRoot.innerHTML = `
         <style>

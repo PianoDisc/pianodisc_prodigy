@@ -67,12 +67,16 @@ class PianoDiscPlaylistCard extends HTMLElement {
     this._retryTimer = null;
   }
 
+  _configuredEntityMissing() {
+    return Boolean(this._entityId && this._hass && !this._hass.states[this._entityId]);
+  }
+
   async _load(refresh = false) {
     // The card picker creates an empty preview instance. Do not issue a live
     // websocket request until the visual editor has selected the piano, but do
     // render a complete empty-config state so the picker does not spin forever.
     if (!this._hass || this._loading) return;
-    if (!this._entityId) {
+    if (!this._entityId || this._configuredEntityMissing()) {
       this._render();
       return;
     }
@@ -108,6 +112,10 @@ class PianoDiscPlaylistCard extends HTMLElement {
 
   async _save() {
     if (!this._hass || !this._entityId || this._saving || this._loading) return;
+    if (this._configuredEntityMissing()) {
+      this._render();
+      return;
+    }
     this._saving = true;
     this._error = "";
     this._render();
@@ -293,6 +301,20 @@ class PianoDiscPlaylistCard extends HTMLElement {
   }
 
   _render() {
+    if (this._configuredEntityMissing()) {
+      this.shadowRoot.innerHTML = `
+      <style>
+        :host { display: block; color: var(--primary-text-color); }
+        .empty {
+          color: var(--secondary-text-color);
+          padding: 24px;
+          text-align: center;
+        }
+      </style>
+      <ha-card><div class="empty">Choose an available PianoDisc media player.</div></ha-card>
+    `;
+      return;
+    }
     if (!this._entityId) {
       this.shadowRoot.innerHTML = `
       <style>
