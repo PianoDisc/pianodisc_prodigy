@@ -53,7 +53,7 @@
   "services": {
     "play_song": {
       "name": "Play song",
-      "description": "Play a song by name on the piano, optionally setting the volume first and restoring it afterwards.",
+      "description": "Play one song by name on the piano, optionally setting the volume first and restoring it afterwards.",
       "fields": {
         "song": {
           "name": "Song",
@@ -66,6 +66,10 @@
         "restore_volume_after": {
           "name": "Restore volume after",
           "description": "Restore the previous volume once the song has been started."
+        },
+        "continue_after": {
+          "name": "Continue after",
+          "description": "Keep playing the SD-card library after this song instead of stopping."
         }
       }
     },

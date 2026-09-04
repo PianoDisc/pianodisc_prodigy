@@ -11,6 +11,9 @@ Working examples to copy and adapt. Entity IDs vary by installation — replace
 The dependable way to play a specific song. Because it matches on the name, it keeps
 working when the SD card contents change.
 
+The requested song stops when it finishes. Set `continue_after: true` when the automation
+should continue through the SD-card library after it.
+
 ```yaml
 action: pianodisc_prodigy.play_song
 target:

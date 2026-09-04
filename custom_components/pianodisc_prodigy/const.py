@@ -157,6 +157,7 @@ SONG_UNKNOWN_GRACE: Final = 30.0  # seconds
 # /playerStatus.sort lags after we POST a shuffle change; hold the just-set value until
 # the device's reading catches up (or this lapses) so the shuffle switch sticks.
 SHUFFLE_HOLD_GRACE: Final = 60.0  # seconds
+REPEAT_HOLD_GRACE: Final = 60.0  # seconds
 
 # Firmware version policy. Floors are the first released builds carrying the
 # Home Assistant behavior this integration depends on; recommended values are only

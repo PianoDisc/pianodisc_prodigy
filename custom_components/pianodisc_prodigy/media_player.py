@@ -94,6 +94,7 @@ async def async_setup_entry(
                 vol.Coerce(int), vol.Range(min=0, max=VOLUME_MAX)
             ),
             vol.Optional("restore_volume_after", default=False): cv.boolean,
+            vol.Optional("continue_after", default=False): cv.boolean,
         },
         "async_play_song",
     )
@@ -489,8 +490,9 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
                 translation_key="song_not_found",
                 translation_placeholders={"song": media_id},
             )
+        single = self._single_song_playback_requested()
         await self.coordinator.async_execute_device_command(
-            self.coordinator.transport.async_play_path(media_id)
+            self.coordinator.transport.async_play_path(media_id, single=single)
         )
         await self.coordinator.async_request_refresh()
 
@@ -524,7 +526,11 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
 
     # -- custom service ----------------------------------------------------
     async def async_play_song(
-        self, song: str, volume: int | None = None, restore_volume_after: bool = False
+        self,
+        song: str,
+        volume: int | None = None,
+        restore_volume_after: bool = False,
+        continue_after: bool = False,
     ) -> None:
         """Play a song by (fuzzy) name, optionally setting/restoring volume.
 
@@ -554,7 +560,12 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
                 translation_key="song_not_found",
                 translation_placeholders={"song": song},
             )
-        await self.coordinator.async_execute_device_command(transport.async_play_path(path))
+        await self.coordinator.async_execute_device_command(
+            transport.async_play_path(
+                path,
+                single=not continue_after and self._single_song_playback_requested(),
+            )
+        )
 
         if restore_volume_after and prior is not None:
             await self.coordinator.async_execute_device_command(
@@ -563,6 +574,11 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         await self.coordinator.async_request_refresh()
 
     # -- helpers -----------------------------------------------------------
+    def _single_song_playback_requested(self) -> bool:
+        """Default direct song playback to one song unless repeat requests a loop."""
+        data = self.coordinator.data
+        return data.queue_mode != "all_songs" or data.repeat_mode in (None, 0)
+
     async def _ensure_powered(self) -> None:
         """Power on first when the piano is off but linked to an outlet."""
         if self.coordinator.power_linked and self.coordinator.power_on is False:

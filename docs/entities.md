@@ -164,13 +164,14 @@ playlists. See [SD card, MIDI files and playlists](sd-card.md).
 
 ### `pianodisc_prodigy.play_song`
 
-Plays a song by name.
+Plays a song by name and stops after that song by default.
 
 | Field | Required | Description |
 |---|---|---|
 | `song` | Yes | Name of the song. Matched against the library — an exact match wins, otherwise the first song containing this text |
 | `volume` | No | Volume 0–100 to set before playing |
 | `restore_volume_after` | No | Return to the previous volume once the song starts. Default `false` |
+| `continue_after` | No | Keep playing the SD-card library after this song instead of stopping. Default `false` |
 
 Raises an error if no song matches, so a failing automation is visible in the logs rather
 than silently doing nothing.

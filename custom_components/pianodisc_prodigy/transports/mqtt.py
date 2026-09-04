@@ -185,6 +185,7 @@ class MqttTransport(Transport):
         self._mqtt_last_live_at: float | None = None
         self._http_device_info_seen = False
         self._mqtt_volume_seen = False
+        self._volume_backfill_needed = True
         self._shuffle_target: bool | None = None
         self._shuffle_hold_until = 0.0
         # After a (re)play, suppress this stale title until a new one appears.
@@ -538,6 +539,7 @@ class MqttTransport(Transport):
         volume = _percent_volume(msg.payload)
         if volume is not None:
             self._mqtt_volume_seen = True
+            self._volume_backfill_needed = False
             self._push(volume=volume, available=self._avail(msg))
 
     @callback
@@ -762,6 +764,7 @@ class MqttTransport(Transport):
         self._mqtt_status_seen = False
         self._mqtt_last_live_at = None
         self._mqtt_volume_seen = False
+        self._volume_backfill_needed = True
         self._shuffle_target = None
         self._shuffle_hold_until = 0.0
         self._prev_song = None
@@ -880,16 +883,19 @@ class MqttTransport(Transport):
             await self._publish(command)
         self._push()
 
-    async def async_play_path(self, path: str) -> None:
+    async def async_play_path(self, path: str, *, single: bool = False) -> None:
         """Ask the NRF to resolve a path against its current SD-card library."""
         self._playback_seen = True
         self._last_song_path = path
         self._optimistic_new_song()
+        params: dict[str, object] = {"song": path}
+        if single:
+            params["single"] = True
         if not self._mqtt_live and self._http is not None:
-            await self._http.async_play_path(path)
+            await self._http.async_play_path(path, single=single)
         else:
             await self._publish(
-                {"type": "MIDIPlayer", "exec": "Playback", "params": {"song": path}}
+                {"type": "MIDIPlayer", "exec": "Playback", "params": params}
             )
         self._push()
 
@@ -940,7 +946,8 @@ class MqttTransport(Transport):
         # Optimistic percent so the slider tracks instantly; the poll reads it back.
         if level_1_100 > 0:
             self._pre_mute_volume = int(level_1_100)
-        self._mqtt_volume_seen = True
+        if not self._mqtt_volume_seen:
+            self._volume_backfill_needed = True
         self._push(volume=int(level_1_100))
         if not self._mqtt_live and self._http is not None:
             await self._http.async_set_volume(level_1_100)
@@ -951,7 +958,8 @@ class MqttTransport(Transport):
         if mute and self._data.volume is not None and self._data.volume > 0:
             self._pre_mute_volume = self._data.volume
         target = 0 if mute else self._pre_mute_volume
-        self._mqtt_volume_seen = True
+        if not self._mqtt_volume_seen:
+            self._volume_backfill_needed = True
         self._push(volume=target)
         if not self._mqtt_live and self._http is not None:
             await self._http.async_mute_volume(mute)
@@ -1038,6 +1046,8 @@ class MqttTransport(Transport):
             song = self._resolve_song(playback.song)
             if song is not None and playback.song_path is not None:
                 self._last_song_path = playback.song_path
+            if playback.volume is not None:
+                self._volume_backfill_needed = False
             # HTTP is authoritative whenever this piano is not live on MQTT. In
             # particular, it must replace an MQTT watchdog's stale OFFLINE with the
             # ESP's current WARMING_UP/READY state.
@@ -1082,6 +1092,15 @@ class MqttTransport(Transport):
                         bluetooth_name=info.get("bluetooth_name"),
                     )
             self._data = merged
+        elif (
+            self._http is not None
+            and not self._mqtt_volume_seen
+            and self._volume_backfill_needed
+        ):
+            volume = await self._http.async_fetch_volume()
+            if volume is not None:
+                self._volume_backfill_needed = False
+                self._data = self._data.merge(volume=volume)
         self._data = self._data.merge(state=self._derive_state())
         return self._data
 

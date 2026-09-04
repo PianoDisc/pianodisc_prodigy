@@ -124,8 +124,8 @@ class Transport(ABC):
         """Play song ``index`` (None / -1 = play/resume)."""
 
     @abstractmethod
-    async def async_play_path(self, path: str) -> None:
-        """Play the exact SD-card path, resolved by the device's live library."""
+    async def async_play_path(self, path: str, *, single: bool = False) -> None:
+        """Play the exact SD-card path, optionally stopping after that one song."""
 
     @abstractmethod
     async def async_pause(self) -> None:
