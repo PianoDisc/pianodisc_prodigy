@@ -128,6 +128,11 @@ can carry on using Home Assistant while it works.
 
 *Configuration entity.*
 
+## Stop playback (button)
+
+Stops the current SD-card MIDI playback. Use it on dashboards where Home Assistant's
+compact media controls show Play/Pause but hide the media player's built-in Stop command.
+
 ## Reboot (button)
 
 Restarts the piano. Playback stops.

@@ -1,4 +1,4 @@
-"""Buttons: reboot the piano, and refresh the SD-card song library."""
+"""Buttons: stop playback, reboot the piano, and refresh the SD-card library."""
 
 from __future__ import annotations
 
@@ -22,10 +22,29 @@ async def async_setup_entry(
     """Set up the reboot and refresh-library buttons."""
     async_add_entities(
         [
+            PianoDiscStopPlaybackButton(entry.runtime_data),
             PianoDiscRebootButton(entry.runtime_data),
             PianoDiscRefreshLibraryButton(entry.runtime_data),
         ]
     )
+
+
+class PianoDiscStopPlaybackButton(PianoDiscEntity, ButtonEntity):
+    """Stops SD-card MIDI playback through a normal dashboard button entity."""
+
+    _attr_translation_key = "stop_playback"
+    _attr_icon = "mdi:stop"
+
+    def __init__(self, coordinator: PianoDiscCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = (
+            coordinator.config_entry.unique_id
+            or coordinator.config_entry.data[CONF_DEVICE_ID]
+        )
+        self._attr_unique_id = f"{device_id}_stop_playback"
+
+    async def async_press(self) -> None:
+        await self.coordinator.transport.async_stop()
 
 
 class PianoDiscRebootButton(PianoDiscEntity, ButtonEntity):
