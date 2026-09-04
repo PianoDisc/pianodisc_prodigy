@@ -171,6 +171,10 @@ automation plays quietly and you don't want that to become the new normal.
 More examples — morning routine, evening wind-down, lighting, quiet hours — are in
 [automation examples](docs/automations.md).
 
+For advanced automations and support diagnostics,
+`pianodisc_prodigy.get_debug_info` returns the piano's live `debugJson` payload through
+`response_variable`. See [automation examples](docs/automations.md#get-debug-json).
+
 ## Optional extras
 
 ### Add MQTT for instant updates

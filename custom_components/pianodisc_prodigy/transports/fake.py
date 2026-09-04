@@ -57,6 +57,10 @@ class FakeTransport(Transport):
             source=None,
             source_list=[],
             device_name=device_name,
+            serial_number="DEMO-SERIAL",
+            wifi_rssi=-54,
+            wifi_ssid="Demo Wi-Fi",
+            bluetooth_name="Demo Prodigy BT",
             firmware_audio="0.5.0",
             firmware_midi="1.4.0",
         )
@@ -107,6 +111,10 @@ class FakeTransport(Transport):
             "Audio Version": self._data.firmware_audio,
             "MIDI Version": self._data.firmware_midi,
             "Ready State": self._data.readiness,
+            "Serial Number": self._data.serial_number,
+            "Wi-Fi RSSI": self._data.wifi_rssi,
+            "Wi-Fi SSID": self._data.wifi_ssid,
+            "Bluetooth Name": self._data.bluetooth_name,
         }
 
     # -- helpers ------------------------------------------------------------

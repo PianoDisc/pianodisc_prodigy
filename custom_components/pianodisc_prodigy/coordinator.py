@@ -209,6 +209,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         }
         self._retune_interval(data)
         self._observe_msc_reset(self.data, data)
+        self._update_device_registry(data)
         # MQTT pushes already cover this transition. HTTP-only and an MQTT-silent
         # hybrid reach READY through this polling path, so give them the same initial
         # library/playlist/AutoPlay prefetch.
@@ -329,11 +330,16 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
             return
 
         changes: dict[str, str] = {}
+        changes["model_id"] = device_id
         if data.ip_address:
             changes["configuration_url"] = f"http://{data.ip_address}"
         version = _format_device_sw_version(data)
         if version:
             changes["sw_version"] = version
+        if data.serial_number:
+            changes["serial_number"] = data.serial_number
+        if data.hardware_version:
+            changes["hw_version"] = data.hardware_version
         if changes:
             registry.async_update_device(device.id, **changes)
 

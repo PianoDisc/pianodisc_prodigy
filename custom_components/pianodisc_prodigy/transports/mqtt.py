@@ -183,6 +183,7 @@ class MqttTransport(Transport):
         self._playback_seen = False
         self._mqtt_status_seen = False
         self._mqtt_last_live_at: float | None = None
+        self._http_device_info_seen = False
         self._mqtt_volume_seen = False
         self._shuffle_target: bool | None = None
         self._shuffle_hold_until = 0.0
@@ -1042,14 +1043,24 @@ class MqttTransport(Transport):
                 busy=None,
                 ip_address=playback.ip_address or self._data.ip_address,
             )
-            if playback.available and merged.firmware_audio is None:
-                # Firmware is static. Fetch it once only after the HTTP endpoint is
-                # actually reachable, rather than repeatedly probing a cold piano.
+            if playback.available and not self._http_device_info_seen:
+                # Firmware and troubleshooting metadata are static enough to fetch once,
+                # and only after the HTTP endpoint is actually reachable.
                 info = await self._http.async_get_device_info()
                 if info:
+                    self._http_device_info_seen = True
                     merged = merged.merge(
-                        firmware_audio=info["audio_version"],
-                        firmware_midi=info["midi_version"],
+                        firmware_audio=(
+                            info.get("audio_version") or merged.firmware_audio
+                        ),
+                        firmware_midi=(
+                            info.get("midi_version") or merged.firmware_midi
+                        ),
+                        serial_number=info.get("serial_number"),
+                        hardware_version=info.get("hardware_version"),
+                        wifi_rssi=info.get("wifi_rssi"),
+                        wifi_ssid=info.get("wifi_ssid"),
+                        bluetooth_name=info.get("bluetooth_name"),
                     )
             self._data = merged
         self._data = self._data.merge(state=self._derive_state())

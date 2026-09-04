@@ -112,6 +112,13 @@ Common values are `READY` (safe to play), `WARMING_UP` (still starting), `OFFLIN
 
 *Diagnostic entity — hidden from dashboards by default.*
 
+## Wi-Fi signal (sensor)
+
+The piano's Wi-Fi RSSI in dBm, with SSID and Bluetooth name attributes. Enable it when
+you need signal history for intermittent dropouts.
+
+*Diagnostic entity — disabled by default.*
+
 ## Refresh library (button)
 
 Re-scans the SD card. Press it after adding or removing songs.
@@ -162,6 +169,13 @@ Plays a song by name.
 
 Raises an error if no song matches, so a failing automation is visible in the logs rather
 than silently doing nothing.
+
+### `pianodisc_prodigy.get_debug_info`
+
+Returns the piano's live `debugJson` payload to an automation through
+`response_variable`. It is useful for advanced automations and support diagnostics.
+
+See [automation examples](automations.md#get-debug-json).
 
 ### Standard media player actions
 

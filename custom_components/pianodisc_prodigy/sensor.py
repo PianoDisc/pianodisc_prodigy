@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity
-from homeassistant.const import EntityCategory
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.const import EntityCategory, SIGNAL_STRENGTH_DECIBELS_MILLIWATT
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -35,6 +35,7 @@ async def async_setup_entry(
             PianoDiscPlaylistStatusSensor(entry.runtime_data),
             PianoDiscReadinessSensor(entry.runtime_data),
             PianoDiscIpAddressSensor(entry.runtime_data),
+            PianoDiscWifiSignalSensor(entry.runtime_data),
         ]
     )
 
@@ -177,3 +178,39 @@ class PianoDiscIpAddressSensor(PianoDiscEntity, SensorEntity):
     @property
     def native_value(self) -> str | None:
         return self.coordinator.data.ip_address
+
+
+class PianoDiscWifiSignalSensor(PianoDiscEntity, SensorEntity):
+    """Expose Wi-Fi signal history for troubleshooting dropouts."""
+
+    _attr_translation_key = "wifi_signal"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
+    _attr_native_unit_of_measurement = SIGNAL_STRENGTH_DECIBELS_MILLIWATT
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator: PianoDiscCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = (
+            coordinator.config_entry.unique_id
+            or coordinator.config_entry.data[CONF_DEVICE_ID]
+        )
+        self._attr_unique_id = f"{device_id}_wifi_signal"
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    @property
+    def native_value(self) -> int | None:
+        return self.coordinator.data.wifi_rssi
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str]:
+        attrs = {}
+        data = self.coordinator.data
+        if data.wifi_ssid:
+            attrs["ssid"] = data.wifi_ssid
+        if data.bluetooth_name:
+            attrs["bluetooth_name"] = data.bluetooth_name
+        return attrs
