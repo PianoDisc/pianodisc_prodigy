@@ -15,9 +15,7 @@ rules:
   has-entity-name: done
   entity-event-setup: done
   dependency-transparency: done
-  action-setup:
-    status: todo
-    comment: play_song is registered as a platform entity service; revisit if a non-entity service is added.
+  action-setup: done
   common-modules: done
   docs-high-level-description: todo
   docs-installation-instructions: todo

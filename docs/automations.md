@@ -37,6 +37,22 @@ Picking a song from the media browser saves its **position** in the library, not
 Add or remove a song on the card and that position may point somewhere else. For anything
 you're saving — a dashboard button, an automation, a script — name the song.
 
+## Get debug JSON
+
+`pianodisc_prodigy.get_debug_info` returns the piano's live `debugJson` payload. Use it
+when an automation needs to inspect raw device details or capture support information.
+It is an on-demand read, not something Home Assistant polls in the background.
+
+```yaml
+action: pianodisc_prodigy.get_debug_info
+target:
+  entity_id: media_player.piano
+response_variable: piano_debug
+```
+
+You can then use fields from `piano_debug` later in the same automation, for example in
+a notification template.
+
 ## Morning music
 
 ```yaml
