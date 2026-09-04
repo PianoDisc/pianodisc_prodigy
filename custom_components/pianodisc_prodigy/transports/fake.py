@@ -42,6 +42,7 @@ class FakeTransport(Transport):
         self.reboot_count = 0
         self.stop_count = 0
         self.song_fetch_count = 0
+        self.last_play_single = False
         self._pre_mute_volume = 40
         self._data = ProdigyData(
             available=True,
@@ -141,7 +142,8 @@ class FakeTransport(Transport):
             media_duration=180,
         )
 
-    async def async_play_path(self, path: str) -> None:
+    async def async_play_path(self, path: str, *, single: bool = False) -> None:
+        self.last_play_single = bool(single)
         try:
             index = _DEMO_SONG_PATHS.index(path)
         except ValueError as err:

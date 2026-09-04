@@ -30,6 +30,7 @@ from ..const import (
     HTTP_SOCKET_LIMIT,
     MAX_SCAN_PAGES,
     PRIME_POLL_WAIT,
+    REPEAT_HOLD_GRACE,
     SCAN_PAGE_ATTEMPTS,
     SCAN_POLL_INTERVAL,
     SCAN_POLL_MAX,
@@ -93,6 +94,8 @@ class HttpTransport(Transport):
         # the device's reading catches up (or grace lapses) so the switch sticks.
         self._shuffle_target: bool | None = None
         self._shuffle_hold_until = 0.0
+        self._repeat_target: int | None = None
+        self._repeat_hold_until = 0.0
 
     @property
     def ip_address(self) -> str | None:
@@ -215,7 +218,7 @@ class HttpTransport(Transport):
                 queue_mode = reported_queue_mode
             reported_repeat = player.get("repeat_mode")
             if isinstance(reported_repeat, int) and reported_repeat in {0, 1, 2}:
-                repeat_mode = reported_repeat
+                repeat_mode = self._resolve_repeat(reported_repeat)
             reported_playlist_repeat = player.get("playlist_repeat")
             if isinstance(reported_playlist_repeat, int) and reported_playlist_repeat >= 0:
                 playlist_repeat = reported_playlist_repeat
@@ -265,6 +268,12 @@ class HttpTransport(Transport):
             source_list=list(self._playlist_names),
         )
 
+    async def async_fetch_volume(self) -> int | None:
+        """Fetch only /getVolume for MQTT-mode volume backfill."""
+        volume = await self._get_json("getVolume")
+        vol = volume.get("volume") if isinstance(volume, dict) else None
+        return vol if isinstance(vol, int) and 0 <= vol <= 100 else None
+
     async def async_fetch_snapshot(self) -> ProdigyData:
         """Full snapshot = the light playback poll + firmware (HTTP-only path)."""
         data = await self.async_fetch_playback()
@@ -285,8 +294,11 @@ class HttpTransport(Transport):
     async def async_play(self, index: int | None = None) -> None:
         await self._request("POST", f"play?index={-1 if index is None else int(index)}")
 
-    async def async_play_path(self, path: str) -> None:
-        await self._request("POST", "playback", json_body={"song": path})
+    async def async_play_path(self, path: str, *, single: bool = False) -> None:
+        payload: dict[str, object] = {"song": path}
+        if single:
+            payload["single"] = True
+        await self._request("POST", "playback", json_body=payload)
 
     async def async_pause(self) -> None:
         await self._request("POST", "pause")
@@ -323,6 +335,8 @@ class HttpTransport(Transport):
     async def async_set_repeat(self, mode: int) -> None:
         if mode not in (0, 1, 2):
             raise ValueError(f"invalid repeat mode: {mode}")
+        self._repeat_target = mode
+        self._repeat_hold_until = asyncio.get_running_loop().time() + REPEAT_HOLD_GRACE
         await self._request("POST", f"player?repeat={mode}")
 
     def _resolve_shuffle(self, observed: bool | None) -> bool | None:
@@ -336,6 +350,19 @@ class HttpTransport(Transport):
         if asyncio.get_running_loop().time() < self._shuffle_hold_until:
             return target  # sort still lagging → keep what the user just set
         self._shuffle_target = None  # grace lapsed → trust the device
+        return observed
+
+    def _resolve_repeat(self, observed: int | None) -> int | None:
+        """Hold a just-set repeat target while /playerStatus.repeat_mode catches up."""
+        target = self._repeat_target
+        if target is None:
+            return observed
+        if observed == target:
+            self._repeat_target = None
+            return observed
+        if asyncio.get_running_loop().time() < self._repeat_hold_until:
+            return target
+        self._repeat_target = None
         return observed
 
     async def async_select_playlist(self, name: str) -> None:

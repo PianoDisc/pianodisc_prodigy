@@ -22,6 +22,11 @@ play_song:
       default: false
       selector:
         boolean:
+    continue_after:
+      required: false
+      default: false
+      selector:
+        boolean:
 
 get_debug_info:
   target:

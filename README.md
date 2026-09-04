@@ -125,6 +125,10 @@ Use the media-player card's **Browse media** action to browse the per-piano SD-c
 and playlists. Home Assistant's native browser keeps this tied to the selected piano and
 supports the integration's cached song search.
 
+Selecting a song from Browse Media or search plays that one song and then stops by
+default. Set repeat to `all` or `one` before selecting it when you want playback to
+continue or loop.
+
 Home Assistant's compact media controls may show Play/Pause without a visible Stop
 button. Add the **Stop playback** button entity next to the media player if you want
 Stop available directly on the dashboard.
@@ -169,7 +173,9 @@ data:
   restore_volume_after: true
 ```
 
-`volume` and `restore_volume_after` are optional. With `restore_volume_after: true` the
+`volume` and `restore_volume_after` are optional. By default, the piano stops after the
+requested song. Set `continue_after: true` to continue through the SD-card library after
+that song. With `restore_volume_after: true` the
 piano returns to its previous volume once the song has started, which is useful when one
 automation plays quietly and you don't want that to become the new normal.
 
