@@ -109,6 +109,7 @@ One **PianoDisc Prodigy II** device with these controls:
 | **Show Control** | Optional MSC cue channels and FIRE events from MSC-enabled MIDI files — [needs MQTT](docs/mqtt.md) |
 | **Library** | How many songs are on the SD card, and whether a scan is running |
 | **Status** | Whether the piano has finished starting up and is safe to play |
+| **Stop playback** | A dedicated Stop button for dashboards where Home Assistant hides the media-player Stop control |
 | **Refresh library** | Re-scan the SD card after you add or remove songs |
 | **Reboot** | Restart the piano |
 | **Power** | Direct control of a linked, dedicated smart plug or outlet |
@@ -125,8 +126,8 @@ and playlists. Home Assistant's native browser keeps this tied to the selected p
 supports the integration's cached song search.
 
 Home Assistant's compact media controls may show Play/Pause without a visible Stop
-button. Add a Tile card with media playback controls if you want Stop available directly
-on the dashboard.
+button. Add the **Stop playback** button entity next to the media player if you want
+Stop available directly on the dashboard.
 
 For playlist editing, add the built-in **PianoDisc Playlists** custom card to any dashboard.
 When you have more than one piano, set `entity` to the media player for the piano this card

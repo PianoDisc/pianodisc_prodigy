@@ -126,6 +126,7 @@
       }
     },
     "button": {
+      "stop_playback": { "name": "Stop playback" },
       "reboot": { "name": "Reboot" },
       "refresh_library": { "name": "Refresh library" }
     },

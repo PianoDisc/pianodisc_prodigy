@@ -40,6 +40,7 @@ class FakeTransport(Transport):
     def __init__(self, device_name: str = "Demo Prodigy") -> None:
         super().__init__()
         self.reboot_count = 0
+        self.stop_count = 0
         self.song_fetch_count = 0
         self._pre_mute_volume = 40
         self._data = ProdigyData(
@@ -152,6 +153,7 @@ class FakeTransport(Transport):
             self._update(state=MediaPlayerState.PAUSED)
 
     async def async_stop(self) -> None:
+        self.stop_count += 1
         # Real device does not clear .../song on stop; entities blank the title.
         self._update(state=MediaPlayerState.IDLE)
 
