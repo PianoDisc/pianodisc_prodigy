@@ -164,6 +164,6 @@ REPEAT_HOLD_GRACE: Final = 60.0  # seconds
 # the fallback latest-version signal when the piano does not report backend update
 # data itself. Actual installed versions are always displayed from device telemetry.
 FW_AUDIO_FLOOR: Final = "0.5.0"
-FW_AUDIO_RECOMMENDED: Final = "0.5.0"
+FW_AUDIO_RECOMMENDED: Final = "0.5.1"
 FW_MIDI_FLOOR: Final = "1.4.0"
-FW_MIDI_RECOMMENDED: Final = "1.4.0"
+FW_MIDI_RECOMMENDED: Final = "1.4.1"
