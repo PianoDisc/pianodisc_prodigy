@@ -359,6 +359,9 @@ class MqttTransport(Transport):
         repeat_mode = _int_value(payload.get("repeat_mode"))
         if repeat_mode not in {0, 1, 2}:
             repeat_mode = None
+        single_song = payload.get("single_song")
+        if not isinstance(single_song, bool):
+            single_song = None
         playlist_repeat = _int_value(payload.get("playlist_repeat"))
         if playlist_repeat is not None and playlist_repeat < 0:
             playlist_repeat = None
@@ -444,6 +447,7 @@ class MqttTransport(Transport):
             "shuffle": self._resolve_shuffle((sort == 1) if sort is not None else None),
             "queue_mode": queue_mode,
             "repeat_mode": repeat_mode,
+            "single_song": single_song,
             "playlist_repeat": playlist_repeat,
             "autoplay_loop": autoplay_loop,
             "source": source,
@@ -982,7 +986,11 @@ class MqttTransport(Transport):
             await self._http.async_set_repeat(mode)
         else:
             await self._publish({"exec": "Repeat", "params": mode})
-        self._push(queue_mode="all_songs", repeat_mode=mode)
+        self._push(
+            queue_mode="all_songs",
+            repeat_mode=mode,
+            single_song=False if mode else self._data.single_song,
+        )
 
     async def async_select_playlist(self, name: str) -> None:
         # Match the rest of hybrid control: an offline MQTT transport must not
@@ -1065,6 +1073,7 @@ class MqttTransport(Transport):
                 shuffle=self._resolve_shuffle(playback.shuffle),
                 queue_mode=playback.queue_mode,
                 repeat_mode=playback.repeat_mode,
+                single_song=playback.single_song,
                 playlist_repeat=playback.playlist_repeat,
                 autoplay_loop=playback.autoplay_loop,
                 source=playback.source,

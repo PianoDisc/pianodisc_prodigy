@@ -52,6 +52,7 @@ class FakeTransport(Transport):
             shuffle=False,
             queue_mode="all_songs",
             repeat_mode=0,
+            single_song=False,
             busy=False,
             song=None,
             song_index=None,
@@ -149,6 +150,7 @@ class FakeTransport(Transport):
         except ValueError as err:
             raise ValueError(f"Song path is not on the SD card: {path}") from err
         await self.async_play(index)
+        self._update(single_song=bool(single))
 
     async def async_pause(self) -> None:
         if self._data.state == MediaPlayerState.PLAYING:
@@ -157,7 +159,7 @@ class FakeTransport(Transport):
     async def async_stop(self) -> None:
         self.stop_count += 1
         # Real device does not clear .../song on stop; entities blank the title.
-        self._update(state=MediaPlayerState.IDLE)
+        self._update(state=MediaPlayerState.IDLE, single_song=False)
 
     async def async_next(self) -> None:
         nxt = ((self._data.song_index or 0) + 1) % len(_DEMO_SONGS)
@@ -187,7 +189,11 @@ class FakeTransport(Transport):
     async def async_set_repeat(self, mode: int) -> None:
         if mode not in (0, 1, 2):
             raise ValueError(f"invalid repeat mode: {mode}")
-        self._update(queue_mode="all_songs", repeat_mode=mode)
+        self._update(
+            queue_mode="all_songs",
+            repeat_mode=mode,
+            single_song=False if mode else self._data.single_song,
+        )
 
     async def async_select_playlist(self, name: str) -> None:
         if name in self._data.source_list:

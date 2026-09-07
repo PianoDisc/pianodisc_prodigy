@@ -87,6 +87,13 @@
           "off": "Idle"
         }
       },
+      "single_song": {
+        "name": "Single-song playback",
+        "state": {
+          "on": "Stops after this song",
+          "off": "Continues after this song"
+        }
+      },
       "msc_channel": { "name": "MSC channel {channel}" }
     },
     "sensor": {

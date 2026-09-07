@@ -36,6 +36,7 @@ class ProdigyData:
     shuffle: bool | None = None
     queue_mode: str | None = None
     repeat_mode: int | None = None
+    single_song: bool | None = None
     playlist_repeat: int | None = None
     autoplay_loop: bool | None = None
     busy: bool | None = None  # solenoids actively striking (MQTT only)
