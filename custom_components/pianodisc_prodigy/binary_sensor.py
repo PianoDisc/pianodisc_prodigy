@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.components.media_player import MediaPlayerState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -18,10 +19,10 @@ async def async_setup_entry(
     entry: PianoDiscConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up piano activity and configured MSC channel sensors."""
+    """Set up piano activity, single-song, and configured MSC channel sensors."""
     coordinator = entry.runtime_data
     async_add_entities(
-        [PianoDiscBusySensor(coordinator)]
+        [PianoDiscBusySensor(coordinator), PianoDiscSingleSongSensor(coordinator)]
         + [
             PianoDiscMscChannel(coordinator, channel)
             for channel in range(1, coordinator.msc_channel_count + 1)
@@ -57,6 +58,31 @@ class PianoDiscBusySensor(PianoDiscEntity, BinarySensorEntity):
         return {
             "requires": "MQTT",
             "setup": "Configure this piano to use Home Assistant's MQTT broker.",
+        }
+
+
+class PianoDiscSingleSongSensor(PianoDiscEntity, BinarySensorEntity):
+    """Indicate that the active song will stop instead of advancing."""
+
+    _attr_translation_key = "single_song"
+    _attr_icon = "mdi:play-one"
+
+    def __init__(self, coordinator: PianoDiscCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = (
+            coordinator.config_entry.unique_id
+            or coordinator.config_entry.data[CONF_DEVICE_ID]
+        )
+        self._attr_unique_id = f"{device_id}_single_song"
+
+    @property
+    def is_on(self) -> bool | None:
+        single_song = self.coordinator.data.single_song
+        if single_song is None:
+            return None
+        return single_song and self.coordinator.data.state in {
+            MediaPlayerState.PLAYING,
+            MediaPlayerState.PAUSED,
         }
 
 

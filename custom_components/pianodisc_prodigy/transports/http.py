@@ -192,6 +192,7 @@ class HttpTransport(Transport):
 
         state = song = song_path = song_index = song_count = shuffle = None
         queue_mode = repeat_mode = playlist_repeat = autoplay_loop = source = None
+        single_song = None
         readiness = "READY"
         media_position = media_duration = None
         if isinstance(player, dict):
@@ -219,6 +220,8 @@ class HttpTransport(Transport):
             reported_repeat = player.get("repeat_mode")
             if isinstance(reported_repeat, int) and reported_repeat in {0, 1, 2}:
                 repeat_mode = self._resolve_repeat(reported_repeat)
+            if isinstance(player.get("single_song"), bool):
+                single_song = player["single_song"]
             reported_playlist_repeat = player.get("playlist_repeat")
             if isinstance(reported_playlist_repeat, int) and reported_playlist_repeat >= 0:
                 playlist_repeat = reported_playlist_repeat
@@ -259,6 +262,7 @@ class HttpTransport(Transport):
             shuffle=self._resolve_shuffle(shuffle),
             queue_mode=queue_mode,
             repeat_mode=repeat_mode,
+            single_song=single_song,
             playlist_repeat=playlist_repeat,
             autoplay_loop=autoplay_loop,
             source=source,

@@ -129,6 +129,10 @@ Selecting a song from Browse Media or search plays that one song and then stops 
 default. Set repeat to `all` or `one` before selecting it when you want playback to
 continue or loop.
 
+Add the **Single-song playback** entity beside the media player to see when the active
+song will stop instead of continuing. Changing repeat to `all` or `one` during playback
+immediately changes what happens when the song ends.
+
 Home Assistant's compact media controls may show Play/Pause without a visible Stop
 button. Add the **Stop playback** button entity next to the media player if you want
 Stop available directly on the dashboard.
