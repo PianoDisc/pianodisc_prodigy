@@ -71,7 +71,7 @@ class PianoDiscSingleSongSwitch(PianoDiscEntity, SwitchEntity):
     """Stop after the active direct song instead of advancing."""
 
     _attr_translation_key = "single_song"
-    _attr_icon = "mdi:play-one"
+    _attr_icon = "mdi:play-circle-outline"
 
     def __init__(self, coordinator: PianoDiscCoordinator) -> None:
         super().__init__(coordinator)
