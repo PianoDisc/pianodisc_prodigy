@@ -195,6 +195,13 @@ class FakeTransport(Transport):
             single_song=False if mode else self._data.single_song,
         )
 
+    async def async_set_single_song(self, enabled: bool) -> None:
+        self._update(
+            queue_mode="all_songs",
+            repeat_mode=0 if enabled else self._data.repeat_mode,
+            single_song=bool(enabled),
+        )
+
     async def async_select_playlist(self, name: str) -> None:
         if name in self._data.source_list:
             self._update(source=name)

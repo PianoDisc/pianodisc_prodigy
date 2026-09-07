@@ -74,14 +74,14 @@ It turns on for anything that drives the keys, including music played from the i
 though in that case Home Assistant knows only that the keys are moving, not what's
 playing. See [the piano is playing but Home Assistant shows no song](troubleshooting.md#the-piano-is-playing-but-home-assistant-shows-no-song).
 
-## Single-song playback (binary sensor)
+## Stop after current song (switch)
 
-On when the current direct song selection will stop when that song ends. It uses the
+Turn it on while a direct song is playing to stop when that song ends. It uses the
 `mdi:play-one` icon so it can sit beside the media player on a dashboard.
 
-Set the media player's repeat control to **all** or **one** while the song is playing to
-continue to the next song or repeat the current song. The sensor turns off as soon as
-that loop is selected.
+Directly selecting a song turns this switch on automatically. Set the media player's
+repeat control to **all** or **one** to continue to the next song or repeat the current
+song; either repeat choice turns the switch off automatically.
 
 ## Show Control (sub-device)
 

@@ -343,6 +343,9 @@ class HttpTransport(Transport):
         self._repeat_hold_until = asyncio.get_running_loop().time() + REPEAT_HOLD_GRACE
         await self._request("POST", f"player?repeat={mode}")
 
+    async def async_set_single_song(self, enabled: bool) -> None:
+        await self._request("POST", f"player?single={1 if enabled else 0}")
+
     def _resolve_shuffle(self, observed: bool | None) -> bool | None:
         """Hold a just-set shuffle target while /playerStatus.sort catches up."""
         target = self._shuffle_target

@@ -160,6 +160,10 @@ class Transport(ABC):
         """Set All Songs repeat: 0=off, 1=all songs, 2=current song."""
 
     @abstractmethod
+    async def async_set_single_song(self, enabled: bool) -> None:
+        """Choose whether the active song stops when it ends."""
+
+    @abstractmethod
     async def async_select_playlist(self, name: str) -> None:
         """Select / play the named playlist as the active source."""
 
