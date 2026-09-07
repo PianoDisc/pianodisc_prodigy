@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from homeassistant.components.media_player import MediaPlayerState
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
@@ -21,9 +22,10 @@ async def async_setup_entry(
     entry: PianoDiscConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up AutoPlay configuration switches."""
+    """Set up playback and AutoPlay configuration switches."""
     async_add_entities(
         [
+            PianoDiscSingleSongSwitch(entry.runtime_data),
             PianoDiscAutoPlayEnableSwitch(entry.runtime_data),
             PianoDiscAutoPlayLoopSwitch(entry.runtime_data),
         ]
@@ -63,6 +65,41 @@ class _PianoDiscAutoPlaySwitch(PianoDiscEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self.coordinator.async_save_autoplay_config({self._config_key: False})
+
+
+class PianoDiscSingleSongSwitch(PianoDiscEntity, SwitchEntity):
+    """Stop after the active direct song instead of advancing."""
+
+    _attr_translation_key = "single_song"
+    _attr_icon = "mdi:play-one"
+
+    def __init__(self, coordinator: PianoDiscCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = (
+            coordinator.config_entry.unique_id
+            or coordinator.config_entry.data[CONF_DEVICE_ID]
+        )
+        self._attr_unique_id = f"{device_id}_single_song"
+
+    @property
+    def available(self) -> bool:
+        return (
+            super().available
+            and self.coordinator.data.single_song is not None
+            and self.coordinator.data.queue_mode == "all_songs"
+            and self.coordinator.data.state
+            in {MediaPlayerState.PLAYING, MediaPlayerState.PAUSED}
+        )
+
+    @property
+    def is_on(self) -> bool | None:
+        return self.coordinator.data.single_song
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self.coordinator.transport.async_set_single_song(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self.coordinator.transport.async_set_single_song(False)
 
 
 class PianoDiscAutoPlayEnableSwitch(_PianoDiscAutoPlaySwitch):

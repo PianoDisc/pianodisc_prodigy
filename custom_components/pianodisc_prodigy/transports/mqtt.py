@@ -992,6 +992,17 @@ class MqttTransport(Transport):
             single_song=False if mode else self._data.single_song,
         )
 
+    async def async_set_single_song(self, enabled: bool) -> None:
+        if not self._mqtt_live and self._http is not None:
+            await self._http.async_set_single_song(enabled)
+        else:
+            await self._publish({"exec": "Single", "params": 1 if enabled else 0})
+        self._push(
+            queue_mode="all_songs",
+            repeat_mode=0 if enabled else self._data.repeat_mode,
+            single_song=enabled,
+        )
+
     async def async_select_playlist(self, name: str) -> None:
         # Match the rest of hybrid control: an offline MQTT transport must not
         # prevent playlist playback when the piano's HTTP API is still reachable.

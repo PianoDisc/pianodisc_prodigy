@@ -125,13 +125,13 @@ Use the media-player card's **Browse media** action to browse the per-piano SD-c
 and playlists. Home Assistant's native browser keeps this tied to the selected piano and
 supports the integration's cached song search.
 
-Selecting a song from Browse Media or search plays that one song and then stops by
-default. Set repeat to `all` or `one` before selecting it when you want playback to
+Selecting a song from Browse Media or search always starts with **Stop after current
+song** enabled. Change repeat to `all` or `one` while it is playing when you want it to
 continue or loop.
 
-Add the **Single-song playback** entity beside the media player to see when the active
-song will stop instead of continuing. Changing repeat to `all` or `one` during playback
-immediately changes what happens when the song ends.
+Add the **Stop after current song** switch beside the media player. Turn it on during a
+song to stop after that song; turn it off to continue according to the current queue.
+Changing repeat to `all` or `one` automatically turns this switch off.
 
 Home Assistant's compact media controls may show Play/Pause without a visible Stop
 button. Add the **Stop playback** button entity next to the media player if you want

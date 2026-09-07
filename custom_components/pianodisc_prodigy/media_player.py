@@ -575,9 +575,8 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
 
     # -- helpers -----------------------------------------------------------
     def _single_song_playback_requested(self) -> bool:
-        """Default direct song playback to one song unless repeat requests a loop."""
-        data = self.coordinator.data
-        return data.queue_mode != "all_songs" or data.repeat_mode in (None, 0)
+        """A direct song choice always starts as a one-song playback."""
+        return True
 
     async def _ensure_powered(self) -> None:
         """Power on first when the piano is off but linked to an outlet."""

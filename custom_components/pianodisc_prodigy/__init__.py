@@ -136,6 +136,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) ->
 
     _remove_legacy_shuffle_entity(hass, entry)
     _remove_legacy_power_proxy_entity(hass, entry)
+    _remove_legacy_single_song_sensor(hass, entry)
     _async_sync_msc_registry(hass, entry, coordinator)
 
     entry.runtime_data = coordinator
@@ -256,6 +257,19 @@ def _remove_legacy_power_proxy_entity(
     device_id = entry.unique_id or entry.data[CONF_DEVICE_ID]
     registry = er.async_get(hass)
     entity_id = registry.async_get_entity_id("switch", DOMAIN, f"{device_id}_power")
+    if entity_id is not None:
+        registry.async_remove(entity_id)
+
+
+def _remove_legacy_single_song_sensor(
+    hass: HomeAssistant, entry: PianoDiscConfigEntry
+) -> None:
+    """Migrate the former read-only single-song sensor to the control switch."""
+    device_id = entry.unique_id or entry.data[CONF_DEVICE_ID]
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{device_id}_single_song"
+    )
     if entity_id is not None:
         registry.async_remove(entity_id)
 

@@ -87,13 +87,6 @@
           "off": "Idle"
         }
       },
-      "single_song": {
-        "name": "Single-song playback",
-        "state": {
-          "on": "Stops after this song",
-          "off": "Continues after this song"
-        }
-      },
       "msc_channel": { "name": "MSC channel {channel}" }
     },
     "sensor": {
@@ -143,6 +136,7 @@
     },
     "switch": {
       "power": { "name": "Power" },
+      "single_song": { "name": "Stop after current song" },
       "autoplay": { "name": "AutoPlay" },
       "autoplay_loop": { "name": "AutoPlay loop" }
     },
