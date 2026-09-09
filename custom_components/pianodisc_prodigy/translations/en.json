@@ -130,13 +130,13 @@
       }
     },
     "button": {
-      "stop_playback": { "name": "Stop playback" },
+      "stop_playback": { "name": "Stop" },
       "reboot": { "name": "Reboot" },
       "refresh_library": { "name": "Refresh library" }
     },
     "switch": {
       "power": { "name": "Power" },
-      "single_song": { "name": "Stop after current song" },
+      "single_song": { "name": "Single play" },
       "autoplay": { "name": "AutoPlay" },
       "autoplay_loop": { "name": "AutoPlay loop" }
     },

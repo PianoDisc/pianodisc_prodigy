@@ -142,6 +142,10 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         # can never wedge, and overridden the moment the piano reports. See
         # [[power-architecture]].
         self._powering_on_until = 0.0
+        # Single Play: a direct song pick plays that song only and stops. Kept on
+        # the HA side because the device treats the flag as part of each play
+        # request and forgets it afterwards. Restored by the switch entity.
+        self.single_play = True
         self.msc_channel_count = int(
             entry.options.get(CONF_MSC_CHANNELS, DEFAULT_MSC_CHANNELS)
         )

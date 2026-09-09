@@ -82,14 +82,20 @@ It turns on for anything that drives the keys, including music played from the i
 though in that case Home Assistant knows only that the keys are moving, not what's
 playing. See [the piano is playing but Home Assistant shows no song](troubleshooting.md#the-piano-is-playing-but-home-assistant-shows-no-song).
 
-## Stop after current song (switch)
+## Single play (switch)
 
-Turn it on while a direct song is playing to stop when that song ends. It uses the
-`mdi:play-one` icon so it can sit beside the media player on a dashboard.
+On by default. When on, directly selecting a song (Browse Media, search, the library
+card, or the `play_song` action) plays that one song and stops. When off, a song pick
+plays on through the SD card from that song.
 
-Directly selecting a song turns this switch on automatically. Set the media player's
-repeat control to **all** or **one** to continue to the next song or repeat the current
-song; either repeat choice turns the switch off automatically.
+The switch is always available. When the piano is idle it shows the mode the next song
+pick will use, and an automation can set it before starting a song. While a song from
+the SD card is playing or paused it mirrors the piano's live flag, and flipping it
+changes what happens when the current song ends. Setting the media player's repeat
+control to **all** or **one** during a song turns it off for that song. The mode is
+remembered across Home Assistant restarts.
+
+Playlists and AutoPlay are not affected; they always play through.
 
 ## Show Control (sub-device)
 
@@ -145,7 +151,7 @@ can carry on using Home Assistant while it works.
 
 *Configuration entity.*
 
-## Stop playback (button)
+## Stop (button)
 
 Stops the current SD-card MIDI playback. Use it on dashboards where Home Assistant's
 compact media controls show Play/Pause but hide the media player's built-in Stop command.

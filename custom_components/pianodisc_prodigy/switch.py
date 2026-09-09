@@ -9,6 +9,7 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import CONF_DEVICE_ID
 from .coordinator import PianoDiscConfigEntry, PianoDiscCoordinator
@@ -67,8 +68,14 @@ class _PianoDiscAutoPlaySwitch(PianoDiscEntity, SwitchEntity):
         await self.coordinator.async_save_autoplay_config({self._config_key: False})
 
 
-class PianoDiscSingleSongSwitch(PianoDiscEntity, SwitchEntity):
-    """Stop after the active direct song instead of advancing."""
+class PianoDiscSingleSongSwitch(PianoDiscEntity, SwitchEntity, RestoreEntity):
+    """Single Play: a direct song pick plays that song only, then stops.
+
+    Always available. While a song from the all-songs session is playing or
+    paused the switch mirrors the device's live flag and toggling it changes
+    the current song's behaviour; otherwise it shows the mode the next pick
+    will use. The mode is stored on the HA side and restored across restarts.
+    """
 
     _attr_translation_key = "single_song"
     _attr_icon = "mdi:play-circle-outline"
@@ -81,25 +88,38 @@ class PianoDiscSingleSongSwitch(PianoDiscEntity, SwitchEntity):
         )
         self._attr_unique_id = f"{device_id}_single_song"
 
-    @property
-    def available(self) -> bool:
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        if last is not None and last.state in ("on", "off"):
+            self.coordinator.single_play = last.state == "on"
+
+    def _live(self) -> bool:
+        """True while the device's own flag is meaningful for the current song."""
+        data = self.coordinator.data
         return (
-            super().available
-            and self.coordinator.data.single_song is not None
-            and self.coordinator.data.queue_mode == "all_songs"
-            and self.coordinator.data.state
-            in {MediaPlayerState.PLAYING, MediaPlayerState.PAUSED}
+            data.single_song is not None
+            and data.queue_mode == "all_songs"
+            and data.state in {MediaPlayerState.PLAYING, MediaPlayerState.PAUSED}
         )
 
     @property
-    def is_on(self) -> bool | None:
-        return self.coordinator.data.single_song
+    def is_on(self) -> bool:
+        if self._live():
+            return bool(self.coordinator.data.single_song)
+        return self.coordinator.single_play
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        await self.coordinator.transport.async_set_single_song(True)
+        await self._set(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        await self.coordinator.transport.async_set_single_song(False)
+        await self._set(False)
+
+    async def _set(self, enabled: bool) -> None:
+        self.coordinator.single_play = enabled
+        if self._live():
+            await self.coordinator.transport.async_set_single_song(enabled)
+        self.async_write_ha_state()
 
 
 class PianoDiscAutoPlayEnableSwitch(_PianoDiscAutoPlaySwitch):

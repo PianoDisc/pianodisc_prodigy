@@ -109,7 +109,7 @@ One **PianoDisc Prodigy II** device with these controls:
 | **Show Control** | Optional MSC cue channels and FIRE events from MSC-enabled MIDI files — [needs MQTT](docs/mqtt.md) |
 | **Library** | How many songs are on the SD card, and whether a scan is running |
 | **Status** | Whether the piano has finished starting up and is safe to play |
-| **Stop playback** | A dedicated Stop button for dashboards where Home Assistant hides the media-player Stop control |
+| **Stop** | A dedicated Stop button for dashboards where Home Assistant hides the media-player Stop control |
 | **Refresh library** | Re-scan the SD card after you add or remove songs |
 | **Reboot** | Restart the piano |
 | **Power** | Direct control of a linked, dedicated smart plug or outlet |
@@ -125,16 +125,15 @@ Use the media-player card's **Browse media** action to browse the per-piano SD-c
 and playlists. Home Assistant's native browser keeps this tied to the selected piano and
 supports the integration's cached song search.
 
-Selecting a song from Browse Media or search always starts with **Stop after current
-song** enabled. Change repeat to `all` or `one` while it is playing when you want it to
-continue or loop.
-
-Add the **Stop after current song** switch beside the media player. Turn it on during a
-song to stop after that song; turn it off to continue according to the current queue.
-Changing repeat to `all` or `one` automatically turns this switch off.
+**Single play** is on by default: selecting a song from Browse Media, search, or the
+`play_song` action plays that one song and stops. Turn the switch off to have a song
+pick play on through the SD card instead. The switch is always available, so an
+automation can set it before it starts a song. While a song is playing, flipping it
+changes what happens when that song ends. Changing repeat to `all` or `one` during a
+song also turns it off for that song.
 
 Home Assistant's compact media controls may show Play/Pause without a visible Stop
-button. Add the **Stop playback** button entity next to the media player if you want
+button. Add the **Stop** button entity next to the media player if you want
 Stop available directly on the dashboard.
 
 For playlist editing, add the built-in **PianoDisc Playlists** custom card to any dashboard.

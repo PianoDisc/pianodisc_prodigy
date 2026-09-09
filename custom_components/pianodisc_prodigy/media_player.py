@@ -609,8 +609,8 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
 
     # -- helpers -----------------------------------------------------------
     def _single_song_playback_requested(self) -> bool:
-        """A direct song choice always starts as a one-song playback."""
-        return True
+        """A direct song choice follows the Single Play switch (default on)."""
+        return self.coordinator.single_play
 
     async def _ensure_powered(self) -> None:
         """Power on first when the piano is off but linked to an outlet."""
