@@ -125,6 +125,9 @@ Choose the number of channels in the integration's **Options** (`msc_channels`, 
 the piano goes offline; pausing does not reset them. They are not restored after a Home
 Assistant restart. Without MQTT, channel binary sensors show unknown.
 
+To tie a channel to a light, scene, or script, import the
+[show control blueprint](../README.md#show-control-lights-and-effects-that-follow-the-music).
+
 ## Library (sensor)
 
 How many songs Home Assistant has found on the SD card, with a `scanning` attribute that

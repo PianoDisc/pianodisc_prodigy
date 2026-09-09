@@ -219,6 +219,33 @@ does not prevent the separate **Power** switch from controlling a known outlet.
 > **Only link an outlet that powers the piano alone.** Turning the piano off cuts power to
 > whatever you select here.
 
+### Show control: lights and effects that follow the music
+
+MIDI files authored with the PianoDisc MSC Cue Editor carry MIDI Show Control cues. The
+piano publishes them as they play, and the integration turns them into eight numbered
+**channels** on the piano's Show Control device. A `GO` cue turns a channel on, `STOP`
+turns it off, and `FIRE` pulses it. Channel numbers mean the same thing in every song, so
+you tie each channel to a device once and every cue file just works. Needs
+[MQTT](docs/mqtt.md).
+
+Use the blueprint to wire a channel without writing YAML:
+
+[![Import the show control blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FPianoDisc%2Fpianodisc_prodigy%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fpianodisc_prodigy%2Fshow_control_channel.yaml)
+
+Then, for each channel you use, **Settings → Automations → Create automation**, pick
+**PianoDisc show control channel**, and fill in three pickers:
+
+1. **MSC channel** — the channel's sensor, for example *MSC channel 1*.
+2. **MSC channel fire** — the same channel's fire event, *MSC channel 1 fire*.
+3. **Target** — the light, switch, scene, or script the channel drives.
+
+Save it as, say, "Show control channel 1". Repeat for the next channel. The blueprint
+runs cues in parallel so a burst of FIRE cues never delays the GO or STOP behind it, and it
+ignores restarts so a reload never switches your lights off.
+
+For hand-written automations and the raw bus event, see
+[Automations → MIDI Show Control cues](docs/automations.md#midi-show-control-cues).
+
 ## Songs and playlists
 
 All music lives on the SD card in the piano. How you name and organise those files affects

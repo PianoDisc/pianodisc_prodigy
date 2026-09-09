@@ -114,8 +114,24 @@ MSC-enabled MIDI files can trigger automations without YAML on the piano itself.
 channel N. A `GO` cue turns a channel on, a `STOP` cue turns it off, and a `FIRE` cue
 triggers the matching event entity.
 
+**The easy way is the blueprint.** It ties one channel to one target with three pickers,
+handles GO, STOP, and FIRE, and is safe across restarts:
+
+[![Import the show control blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FPianoDisc%2Fpianodisc_prodigy%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fpianodisc_prodigy%2Fshow_control_channel.yaml)
+
+The examples below are for people who want to write their own. Two rules apply to any
+automation triggered by a channel:
+
+- **Do not use `mode: single`** on an automation triggered by a fire event. Cues can
+  arrive several times a second, and `single` drops every cue that lands while the previous
+  one is still running. Use `mode: parallel` (or `queued` if order matters more than
+  timing).
+- **Trigger STOP on `from: "on"` to `to: "off"`**, not on `to: "off"` alone, so a restart
+  that brings the sensor from `unavailable` does not switch things off.
+
 ```yaml
 alias: Cue 1 lights
+mode: parallel
 triggers:
   - trigger: state
     entity_id: binary_sensor.piano_show_control_msc_channel_1
@@ -128,9 +144,12 @@ actions:
 
 ```yaml
 alias: Cue 2 fog
+mode: parallel
 triggers:
   - trigger: state
     entity_id: event.piano_show_control_msc_channel_2_fire
+    not_from: [unavailable, unknown]
+    not_to: [unavailable, unknown]
 actions:
   - action: scene.turn_on
     target:
