@@ -21,6 +21,7 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import dt as dt_util
 import voluptuous as vol
 
 from .const import CONF_DEVICE_ID, DOMAIN, VOLUME_MAX
@@ -69,6 +70,11 @@ _LIBRARY_SYNCING_TITLE = "Syncing library…"
 # Shown while playing but the new song's name isn't known yet (instead of the old one).
 _SONG_LOADING = "Loading…"
 _DEFAULT_ALBUM_ART = f"/{DOMAIN}/default-album-art.png"
+
+# "Previous" more than this far into a song restarts the song instead of jumping
+# back a track, matching the convention of mainstream media players. The device
+# itself always jumps back (and drops single-song mode), so this lives here.
+_PREVIOUS_RESTARTS_AFTER = 3.0
 
 # Root node ids/types for the SD-card browse tree.
 _BROWSE_ROOT = "library"
@@ -317,7 +323,35 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         await self._command(self.coordinator.transport.async_next())
 
     async def async_media_previous_track(self) -> None:
+        if self._should_restart_on_previous():
+            data = self.coordinator.data
+            assert data.song_path is not None
+            single = data.single_song if data.single_song is not None else True
+            await self._command(
+                self.coordinator.transport.async_play_path(data.song_path, single=single)
+            )
+            return
         await self._command(self.coordinator.transport.async_previous())
+
+    def _should_restart_on_previous(self) -> bool:
+        """True when "Previous" should restart the current song rather than go back.
+
+        A path-based play starts a fresh all-songs session on the device, so the
+        restart is only offered in that session; inside a playlist or AutoPlay
+        run "Previous" keeps its device meaning so the session is not abandoned.
+        """
+        data = self.coordinator.data
+        if data.song_path is None or data.state not in _PLAYING_STATES:
+            return False
+        if data.queue_mode not in (None, "all_songs"):
+            return False
+        position = data.media_position
+        if position is None:
+            return False
+        updated_at = data.media_position_updated_at
+        if data.state is MediaPlayerState.PLAYING and updated_at is not None:
+            position += max(0.0, (dt_util.utcnow() - updated_at).total_seconds())
+        return position > _PREVIOUS_RESTARTS_AFTER
 
     async def async_set_volume_level(self, volume: float) -> None:
         # HA 0..1 → device 0..100; 0.0 is the mute volume.
