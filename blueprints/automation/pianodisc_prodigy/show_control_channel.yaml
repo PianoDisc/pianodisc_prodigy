@@ -1,13 +1,10 @@
 blueprint:
   name: PianoDisc show control channel
   description: >-
-    Tie one MIDI Show Control channel of a PianoDisc Prodigy II to anything in Home
-    Assistant. Pick the channel, then say what "on" and "off" mean for it: turn a lamp
-    on and off, start and stop a pump, activate a scene that sets a DMX fixture to a
-    colour and another that clears it. GO runs the on actions, STOP runs the off
-    actions, and FIRE flashes: on, wait, off. Create one automation from this
-    blueprint for each channel you use; channel numbers mean the same thing in every
-    song.
+    Tie one MIDI Show Control channel of a PianoDisc Prodigy II to lights, switches,
+    scenes or scripts. GO turns them on, STOP turns them off, and FIRE flashes them.
+    Create one automation from this blueprint for each channel you use; channel numbers
+    mean the same thing in every song.
   domain: automation
   author: PianoDisc
   source_url: https://github.com/PianoDisc/pianodisc_prodigy/blob/main/blueprints/automation/pianodisc_prodigy/show_control_channel.yaml
@@ -22,26 +19,45 @@ blueprint:
           filter:
             integration: pianodisc_prodigy
             domain: event
-    on_actions:
+    on_entities:
       name: "On"
       description: >-
-        What "on" means for this channel. Runs on GO, and at the start of a FIRE flash.
-        For a lamp or a pump, a turn-on action. For a DMX fixture, activate a scene
-        that sets its brightness and colour.
+        What this channel turns on: lights, switches, a scene, or a script. For a DMX
+        fixture, pick a scene that sets its brightness and colour.
       default: []
       selector:
-        action: {}
-    off_actions:
-      name: "Off"
+        entity:
+          multiple: true
+          filter:
+            domain:
+              - light
+              - switch
+              - fan
+              - scene
+              - script
+              - input_boolean
+              - media_player
+    off_entities:
+      name: "Off (optional)"
       description: >-
-        What "off" means for this channel. Runs on STOP, and at the end of a FIRE
-        flash unless the channel is on. Usually the reverse of On.
+        Something to activate when the channel turns off, such as an "off" scene for a
+        DMX fixture. Leave empty to simply turn the On items off.
       default: []
       selector:
-        action: {}
+        entity:
+          multiple: true
+          filter:
+            domain:
+              - light
+              - switch
+              - fan
+              - scene
+              - script
+              - input_boolean
+              - media_player
     flash_ms:
       name: Flash length
-      description: How long a FIRE cue holds the channel on before running Off.
+      description: How long a FIRE cue holds the channel on before turning it off.
       default: 100
       selector:
         number:
@@ -69,23 +85,54 @@ triggers:
 
 variables:
   channel: !input channel
+  on_entities: !input on_entities
+  off_entities: !input off_entities
+  # A scene cannot be turned off; STOP simply activates the Off items (if any) and
+  # turns off whatever in On is not a scene.
+  turn_off_entities: "{{ on_entities | reject('match', 'scene\\.') | list }}"
   command: "{{ trigger.to_state.attributes.event_type }}"
   cue: "{{ trigger.to_state.attributes.cue | default('') }}"
 
 actions:
   - choose:
       - conditions: "{{ command == 'go' }}"
-        sequence: !input on_actions
+        sequence:
+          - if: "{{ on_entities | count > 0 }}"
+            then:
+              - action: homeassistant.turn_on
+                target:
+                  entity_id: !input on_entities
       - conditions: "{{ command == 'stop' }}"
-        sequence: !input off_actions
+        sequence:
+          - if: "{{ off_entities | count > 0 }}"
+            then:
+              - action: homeassistant.turn_on
+                target:
+                  entity_id: !input off_entities
+          - if: "{{ turn_off_entities | count > 0 }}"
+            then:
+              - action: homeassistant.turn_off
+                target:
+                  entity_id: "{{ turn_off_entities }}"
       - conditions: "{{ command == 'fire' }}"
         sequence:
-          - sequence: !input on_actions
+          - if: "{{ on_entities | count > 0 }}"
+            then:
+              - action: homeassistant.turn_on
+                target:
+                  entity_id: !input on_entities
           - delay:
               milliseconds: !input flash_ms
           # A flash while the channel is on (a GO is active) leaves it on.
-          - if:
-              - condition: template
-                value_template: "{{ not state_attr(channel, 'channel_on') }}"
+          - if: "{{ not state_attr(channel, 'channel_on') }}"
             then:
-              - sequence: !input off_actions
+              - if: "{{ off_entities | count > 0 }}"
+                then:
+                  - action: homeassistant.turn_on
+                    target:
+                      entity_id: !input off_entities
+              - if: "{{ turn_off_entities | count > 0 }}"
+                then:
+                  - action: homeassistant.turn_off
+                    target:
+                      entity_id: "{{ turn_off_entities }}"
