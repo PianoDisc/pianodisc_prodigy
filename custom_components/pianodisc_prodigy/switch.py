@@ -13,7 +13,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import CONF_DEVICE_ID
 from .coordinator import PianoDiscConfigEntry, PianoDiscCoordinator
-from .entity import PianoDiscEntity
+from .entity import PianoDiscAutoPlayEntity, PianoDiscEntity
 
 PARALLEL_UPDATES = 1
 
@@ -33,7 +33,7 @@ async def async_setup_entry(
     )
 
 
-class _PianoDiscAutoPlaySwitch(PianoDiscEntity, SwitchEntity):
+class _PianoDiscAutoPlaySwitch(PianoDiscAutoPlayEntity, SwitchEntity):
     """Shared behavior for the two persisted AutoPlay boolean settings."""
 
     _attr_entity_category = EntityCategory.CONFIG
@@ -127,6 +127,8 @@ class PianoDiscAutoPlayEnableSwitch(_PianoDiscAutoPlaySwitch):
 
     _attr_translation_key = "autoplay"
     _attr_icon = "mdi:play-circle-outline"
+    # The on/off switch is the sub-device's primary control; the rest are settings.
+    _attr_entity_category = None
     _config_key = "enable"
 
     def __init__(self, coordinator: PianoDiscCoordinator) -> None:

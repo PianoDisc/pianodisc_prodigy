@@ -373,6 +373,11 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
             )
             self._notify_library_refresh = False
 
+    async def async_refresh_device_info(self) -> None:
+        """Re-read the piano's debug JSON metadata (the Refresh device info button)."""
+        self.transport.invalidate_device_info()
+        await self.async_request_refresh()
+
     async def async_refresh_library(self) -> None:
         """Force a library re-scan (the Refresh-library button), with a progress
         notification. The scan's terminal progress event clears the notification."""

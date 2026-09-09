@@ -126,18 +126,19 @@
     "button": {
       "stop_playback": { "name": "Stop" },
       "reboot": { "name": "Reboot" },
-      "refresh_library": { "name": "Refresh library" }
+      "refresh_library": { "name": "Refresh library" },
+      "refresh_device_info": { "name": "Refresh device info" }
     },
     "switch": {
       "power": { "name": "Power" },
       "single_song": { "name": "Single play" },
-      "autoplay": { "name": "AutoPlay" },
-      "autoplay_loop": { "name": "AutoPlay loop" }
+      "autoplay": { "name": "Enabled" },
+      "autoplay_loop": { "name": "Loop" }
     },
     "select": {
       "playlist": { "name": "Playlist" },
-      "autoplay_playlist": { "name": "AutoPlay playlist" },
-      "autoplay_sort": { "name": "AutoPlay playback order" }
+      "autoplay_playlist": { "name": "Playlist" },
+      "autoplay_sort": { "name": "Playback order" }
     },
     "update": {
       "audio_firmware": { "name": "Audio firmware" },
