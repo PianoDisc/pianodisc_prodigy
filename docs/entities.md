@@ -62,7 +62,9 @@ see [SD card, MIDI files and playlists](sd-card.md).
 
 ## Busy (binary sensor)
 
-On while the player system is playing — that is, while the piano is driving its own keys.
+`on` while the player system is playing — that is, while the piano is driving its own
+keys — and `off` otherwise. Those are the literal state values to use in automations and
+templates.
 
 The piano reports this straight from its SD player, so it changes the moment playback
 starts or stops. That makes it the most immediate signal the integration receives, and
