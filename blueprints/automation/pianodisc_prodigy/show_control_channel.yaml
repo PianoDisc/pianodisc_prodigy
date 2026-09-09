@@ -83,6 +83,12 @@ triggers:
       - unavailable
       - unknown
 
+# The event entity also carries the channel's state as an attribute, and a state
+# trigger fires on attribute changes too. Only a new cue (a new timestamp) counts.
+conditions:
+  - condition: template
+    value_template: "{{ trigger.to_state.state != trigger.from_state.state }}"
+
 variables:
   channel: !input channel
   on_entities: !input on_entities
