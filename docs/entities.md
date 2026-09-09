@@ -123,7 +123,7 @@ two entities:
 | Entity | Type | Meaning |
 |---|---|---|
 | **Channel N** | binary sensor | `on` after a `GO` cue, `off` after `STOP` |
-| **Channel N cue** | event | Every cue that reached the channel, in order. Event type `go`, `stop`, or `fire`, with the cue number in the `cue` attribute |
+| **Channel N cue** | event | Every cue that reached the channel, in order. Event type `go`, `stop`, or `fire`, with the cue number in the `cue` attribute and the channel's live state in `channel_on` |
 
 Automations trigger on the cue event; the binary sensor is for dashboards and
 conditions. The event entity's history is also the quickest way to check what a cue file

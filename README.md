@@ -237,14 +237,15 @@ Then, for each channel you use, **Settings → Automations → Create automation
 **PianoDisc show control channel**, and fill it in:
 
 1. **Channel** — the channel's cue event, for example *Channel 1 cue*.
-2. **On GO** — what happens when the channel turns on.
-3. **On STOP** — what happens when it turns off.
-4. **On FIRE** — optional; what each FIRE cue does.
+2. **On** — what "on" means for this channel.
+3. **Off** — what "off" means for it.
+4. **Flash length** — how long a FIRE holds the channel on, default 100 ms.
 
-GO, STOP, and FIRE are ordinary action lists, built with the same editor as any
-automation, so a channel can drive anything:
+GO runs On, STOP runs Off, and FIRE flashes: On, wait, Off. A flash while the channel is
+already on leaves it on. On and Off are ordinary action lists, built with the same editor
+as any automation, so a channel can drive anything:
 
-| Device | On GO | On STOP |
+| Device | On | Off |
 |---|---|---|
 | A floor lamp | *Light: Turn on* the lamp | *Light: Turn off* the lamp |
 | A pump or fountain | *Switch: Turn on* | *Switch: Turn off* |
