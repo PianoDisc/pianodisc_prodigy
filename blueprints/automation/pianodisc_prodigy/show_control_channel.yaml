@@ -23,7 +23,7 @@ blueprint:
             integration: pianodisc_prodigy
             domain: event
     on_actions:
-      name: On
+      name: "On"
       description: >-
         What "on" means for this channel. Runs on GO, and at the start of a FIRE flash.
         For a lamp or a pump, a turn-on action. For a DMX fixture, activate a scene
@@ -32,7 +32,7 @@ blueprint:
       selector:
         action: {}
     off_actions:
-      name: Off
+      name: "Off"
       description: >-
         What "off" means for this channel. Runs on STOP, and at the end of a FIRE
         flash unless the channel is on. Usually the reverse of On.
