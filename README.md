@@ -233,15 +233,33 @@ Use the blueprint to wire a channel without writing YAML:
 [![Import the show control blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FPianoDisc%2Fpianodisc_prodigy%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fpianodisc_prodigy%2Fshow_control_channel.yaml)
 
 Then, for each channel you use, **Settings → Automations → Create automation**, pick
-**PianoDisc show control channel**, and fill in three pickers:
+**PianoDisc show control channel**, and fill it in:
 
 1. **MSC channel** — the channel's sensor, for example *MSC channel 1*.
 2. **MSC channel fire** — the same channel's fire event, *MSC channel 1 fire*.
-3. **Target** — the light, switch, scene, or script the channel drives.
+3. **On GO** — what happens when the channel turns on.
+4. **On STOP** — what happens when it turns off.
+5. **On FIRE** — optional; what each FIRE cue does.
 
-Save it as, say, "Show control channel 1". Repeat for the next channel. The blueprint
-runs cues in parallel so a burst of FIRE cues never delays the GO or STOP behind it, and it
-ignores restarts so a reload never switches your lights off.
+GO, STOP, and FIRE are ordinary action lists, built with the same editor as any
+automation, so a channel can drive anything:
+
+| Device | On GO | On STOP |
+|---|---|---|
+| A floor lamp | *Light: Turn on* the lamp | *Light: Turn off* the lamp |
+| A pump or fountain | *Switch: Turn on* | *Switch: Turn off* |
+| A DMX fixture, "purple wash" | *Scene: Activate* → **Purple wash** | *Scene: Activate* → **Wash off** |
+
+For a DMX fixture, make the scene first: set the fixture's dimmer, colour, and effect
+entities exactly how you want them, then **Settings → Automations → Scenes → Add scene**
+and capture them. A scene is Home Assistant's way of saying "this exact look across
+several entities", and the scene editor gives you the colour picker. One scene per look,
+one channel per look.
+
+Name each automation after its channel, for example "Show control channel 1", so the
+list stays readable. The blueprint runs cues in parallel so a burst of FIRE cues never
+delays the GO or STOP behind it, and it ignores restarts so a reload never switches your
+lights off.
 
 For hand-written automations and the raw bus event, see
 [Automations → MIDI Show Control cues](docs/automations.md#midi-show-control-cues).

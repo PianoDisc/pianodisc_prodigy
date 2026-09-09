@@ -1,10 +1,12 @@
 blueprint:
   name: PianoDisc show control channel
   description: >-
-    Tie one MIDI Show Control channel of a PianoDisc Prodigy II to a light, switch,
-    scene or script. GO turns the target on, STOP turns it off, FIRE pulses it and then
-    restores it to the channel's state. Create one automation from this blueprint for
-    each channel you use; channel numbers are the same in every song.
+    Tie one MIDI Show Control channel of a PianoDisc Prodigy II to anything in Home
+    Assistant. Choose what happens when the channel's GO cue arrives, what happens on
+    STOP, and optionally what happens on each FIRE cue. Each is an ordinary action
+    list: turn a lamp on, start a pump, activate a scene that sets a DMX fixture to a
+    colour, run a script. Create one automation from this blueprint for each channel
+    you use; channel numbers mean the same thing in every song.
   domain: automation
   author: PianoDisc
   source_url: https://github.com/PianoDisc/pianodisc_prodigy/blob/main/blueprints/automation/pianodisc_prodigy/show_control_channel.yaml
@@ -27,23 +29,28 @@ blueprint:
           filter:
             integration: pianodisc_prodigy
             domain: event
-    target:
-      name: Target
-      description: The light, switch, scene or script this channel drives.
+    go_actions:
+      name: On GO
+      description: >-
+        What happens when the channel turns on. For a lamp or a pump, a turn-on action.
+        For a DMX fixture, activate a scene that sets its brightness and colour.
+      default: []
       selector:
-        target:
-          entity: {}
-    flash_ms:
-      name: Flash length
-      description: How long FIRE holds the target on before restoring it.
-      default: 400
+        action: {}
+    stop_actions:
+      name: On STOP
+      description: What happens when the channel turns off. Usually the reverse of GO.
+      default: []
       selector:
-        number:
-          min: 50
-          max: 5000
-          step: 50
-          unit_of_measurement: ms
-          mode: box
+        action: {}
+    fire_actions:
+      name: On FIRE
+      description: >-
+        What happens on each FIRE cue. A flash, a scene, a script. Leave empty on
+        channels that never fire. The cue number is available as {{ cue }}.
+      default: []
+      selector:
+        action: {}
 
 # Parallel so a burst of FIRE cues never delays the GO or STOP that follows it.
 mode: parallel
@@ -71,34 +78,20 @@ triggers:
       - unknown
     id: fire
 
+variables:
+  cue: "{{ trigger.to_state.attributes.cue | default('') }}"
+
 actions:
   - choose:
       - conditions:
           - condition: trigger
             id: go
-        sequence:
-          - action: homeassistant.turn_on
-            target: !input target
+        sequence: !input go_actions
       - conditions:
           - condition: trigger
             id: stop
-        sequence:
-          - action: homeassistant.turn_off
-            target: !input target
+        sequence: !input stop_actions
       - conditions:
           - condition: trigger
             id: fire
-        sequence:
-          - action: homeassistant.turn_on
-            target: !input target
-          - delay:
-              milliseconds: !input flash_ms
-          # Restore the channel's state: a FIRE while the channel is on leaves it on.
-          - if:
-              - condition: state
-                entity_id: !input channel
-                state: "on"
-            then: []
-            else:
-              - action: homeassistant.turn_off
-                target: !input target
+        sequence: !input fire_actions
