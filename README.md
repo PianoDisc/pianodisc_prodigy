@@ -257,9 +257,12 @@ and capture them. A scene is Home Assistant's way of saying "this exact look acr
 several entities", and the scene editor gives you the colour picker. One scene per look,
 one channel per look.
 
-Home Assistant saves the automation under the blueprint's name. After saving, open the
-editor's **⋮** menu and choose **Rename** to name it after its channel, for example
-"Show control channel 1", so the list stays readable. The blueprint runs cues in parallel so a burst of FIRE cues never
+Home Assistant saves the automation under the blueprint's name and keeps it open in the
+editor. Open the editor's **⋮** menu and choose **Rename** to add the channel number, for
+example "PianoDisc MSC cue 1". For the next channel, either click the back arrow and
+**Create automation** again, or choose **Duplicate** from the same menu and change the
+channel and the scenes. Editing the fields and saving again changes the automation you
+already saved; it does not create a new one. The blueprint runs cues in parallel so a burst of FIRE cues never
 delays the GO or STOP behind it, and it ignores restarts so a reload never switches your
 lights off.
 
