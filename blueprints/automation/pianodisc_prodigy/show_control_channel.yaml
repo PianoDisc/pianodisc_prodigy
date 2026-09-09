@@ -2,11 +2,11 @@ blueprint:
   name: PianoDisc show control channel
   description: >-
     Tie one MIDI Show Control channel of a PianoDisc Prodigy II to anything in Home
-    Assistant. Choose what happens when the channel's GO cue arrives, what happens on
-    STOP, and optionally what happens on each FIRE cue. Each is an ordinary action
-    list: turn a lamp on, start a pump, activate a scene that sets a DMX fixture to a
-    colour, run a script. Create one automation from this blueprint for each channel
-    you use; channel numbers mean the same thing in every song.
+    Assistant. Pick the channel, then choose what happens on its GO cue, on STOP, and
+    optionally on each FIRE cue. Each is an ordinary action list: turn a lamp on, start
+    a pump, activate a scene that sets a DMX fixture to a colour, run a script. Create
+    one automation from this blueprint for each channel you use; channel numbers mean
+    the same thing in every song.
   domain: automation
   author: PianoDisc
   source_url: https://github.com/PianoDisc/pianodisc_prodigy/blob/main/blueprints/automation/pianodisc_prodigy/show_control_channel.yaml
@@ -14,16 +14,8 @@ blueprint:
     min_version: 2024.10.0
   input:
     channel:
-      name: MSC channel
-      description: The channel's on/off sensor on the piano's Show Control device.
-      selector:
-        entity:
-          filter:
-            integration: pianodisc_prodigy
-            domain: binary_sensor
-    fire:
-      name: MSC channel fire
-      description: The same channel's fire event entity.
+      name: Channel
+      description: The channel's cue event on the piano's Show Control device.
       selector:
         entity:
           filter:
@@ -47,7 +39,7 @@ blueprint:
       name: On FIRE
       description: >-
         What happens on each FIRE cue. A flash, a scene, a script. Leave empty on
-        channels that never fire. The cue number is available as {{ cue }}.
+        channels that never fire.
       default: []
       selector:
         action: {}
@@ -57,41 +49,26 @@ mode: parallel
 max: 25
 
 triggers:
+  # The cue event's state is the time of its last cue, so every cue is a state
+  # change. Exclude availability transitions so a restart or reload never triggers.
   - trigger: state
     entity_id: !input channel
-    to: "on"
-    id: go
-  - trigger: state
-    entity_id: !input channel
-    from: "on"
-    to: "off"
-    id: stop
-  # The event entity's state is the time of its last FIRE, so any state change is a
-  # cue. Exclude availability transitions so a restart or reload never fires it.
-  - trigger: state
-    entity_id: !input fire
     not_from:
       - unavailable
       - unknown
     not_to:
       - unavailable
       - unknown
-    id: fire
 
 variables:
+  command: "{{ trigger.to_state.attributes.event_type }}"
   cue: "{{ trigger.to_state.attributes.cue | default('') }}"
 
 actions:
   - choose:
-      - conditions:
-          - condition: trigger
-            id: go
+      - conditions: "{{ command == 'go' }}"
         sequence: !input go_actions
-      - conditions:
-          - condition: trigger
-            id: stop
+      - conditions: "{{ command == 'stop' }}"
         sequence: !input stop_actions
-      - conditions:
-          - condition: trigger
-            id: fire
+      - conditions: "{{ command == 'fire' }}"
         sequence: !input fire_actions

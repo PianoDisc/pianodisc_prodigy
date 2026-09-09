@@ -1,4 +1,4 @@
-"""MIDI Show Control FIRE event entities."""
+"""MIDI Show Control cue event entities: one per channel, carrying GO, STOP and FIRE."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import CONF_DEVICE_ID
-from .coordinator import PianoDiscConfigEntry, PianoDiscCoordinator, msc_fire_signal
+from .coordinator import PianoDiscConfigEntry, PianoDiscCoordinator, msc_cue_signal
 from .entity import PianoDiscShowControlEntity
 
 PARALLEL_UPDATES = 0
@@ -19,21 +19,26 @@ async def async_setup_entry(
     entry: PianoDiscConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up one FIRE event entity per configured MSC channel."""
+    """Set up one cue event entity per configured MSC channel."""
     coordinator = entry.runtime_data
     async_add_entities(
         [
-            PianoDiscMscFire(coordinator, channel)
+            PianoDiscMscCue(coordinator, channel)
             for channel in range(1, coordinator.msc_channel_count + 1)
         ]
     )
 
 
-class PianoDiscMscFire(PianoDiscShowControlEntity, EventEntity):
-    """One-shot FIRE notification for an MSC cue channel."""
+class PianoDiscMscCue(PianoDiscShowControlEntity, EventEntity):
+    """Every cue that reaches one channel, in order: GO, STOP or FIRE.
 
-    _attr_translation_key = "msc_fire"
-    _attr_event_types = ["fire"]
+    The channel's on/off state lives on the matching binary sensor; this entity
+    is the stateless record of each cue, which is what FIRE needs and what an
+    automation wants to trigger on.
+    """
+
+    _attr_translation_key = "msc_cue"
+    _attr_event_types = ["go", "stop", "fire"]
 
     def __init__(self, coordinator: PianoDiscCoordinator, channel: int) -> None:
         super().__init__(coordinator)
@@ -41,10 +46,10 @@ class PianoDiscMscFire(PianoDiscShowControlEntity, EventEntity):
             CONF_DEVICE_ID
         ]
         self._channel = channel
-        self._attr_unique_id = f"{device_id}_msc_fire_ch{channel}"
+        self._attr_unique_id = f"{device_id}_msc_cue_ch{channel}"
         self._attr_translation_placeholders = {"channel": str(channel)}
         if not coordinator.transport.supports_msc:
-            self._attr_name = f"MSC channel {channel} fire (MQTT required)"
+            self._attr_name = f"Channel {channel} cue (MQTT required)"
 
     @property
     def available(self) -> bool:
@@ -59,12 +64,12 @@ class PianoDiscMscFire(PianoDiscShowControlEntity, EventEntity):
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,
-                msc_fire_signal(self.coordinator.config_entry.entry_id, self._channel),
-                self._handle_fire,
+                msc_cue_signal(self.coordinator.config_entry.entry_id, self._channel),
+                self._handle_cue,
             )
         )
 
     @callback
-    def _handle_fire(self, cue: str) -> None:
-        self._trigger_event("fire", {"cue": cue})
+    def _handle_cue(self, command: str, cue: str) -> None:
+        self._trigger_event(command.lower(), {"cue": cue})
         self.async_write_ha_state()

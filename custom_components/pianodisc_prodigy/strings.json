@@ -81,7 +81,7 @@
   "entity": {
     "binary_sensor": {
       "busy": { "name": "Busy" },
-      "msc_channel": { "name": "MSC channel {channel}" }
+      "msc_channel": { "name": "Channel {channel}" }
     },
     "sensor": {
       "library": {
@@ -145,7 +145,14 @@
       "midi_firmware": { "name": "MIDI firmware" }
     },
     "event": {
-      "msc_fire": { "name": "MSC channel {channel} fire" }
+      "msc_cue": {
+        "name": "Channel {channel} cue",
+        "state_attributes": {
+          "event_type": {
+            "state": { "go": "GO", "stop": "STOP", "fire": "FIRE" }
+          }
+        }
+      }
     }
   },
   "exceptions": {

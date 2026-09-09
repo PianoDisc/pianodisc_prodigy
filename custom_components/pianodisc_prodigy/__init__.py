@@ -283,11 +283,14 @@ def _async_sync_msc_registry(
     """Prune resized MSC entities and create the Show Control device hierarchy."""
     device_id = entry.unique_id or entry.data[CONF_DEVICE_ID]
     entity_registry = er.async_get(hass)
-    for channel in range(coordinator.msc_channel_count + 1, MAX_MSC_CHANNELS + 1):
-        for domain, unique_id in (
-            ("binary_sensor", f"{device_id}_msc_ch{channel}"),
-            ("event", f"{device_id}_msc_fire_ch{channel}"),
-        ):
+    for channel in range(1, MAX_MSC_CHANNELS + 1):
+        stale = [("event", f"{device_id}_msc_fire_ch{channel}")]  # pre-0.1.6 FIRE-only
+        if channel > coordinator.msc_channel_count:
+            stale += [
+                ("binary_sensor", f"{device_id}_msc_ch{channel}"),
+                ("event", f"{device_id}_msc_cue_ch{channel}"),
+            ]
+        for domain, unique_id in stale:
             entity_id = entity_registry.async_get_entity_id(domain, DOMAIN, unique_id)
             if entity_id is not None:
                 entity_registry.async_remove(entity_id)

@@ -111,8 +111,8 @@ Requires [MQTT](mqtt.md).
 ## MIDI Show Control cues
 
 MSC-enabled MIDI files can trigger automations without YAML on the piano itself. Cue N is
-channel N. A `GO` cue turns a channel on, a `STOP` cue turns it off, and a `FIRE` cue
-triggers the matching event entity.
+channel N. Each channel has a **Channel N** binary sensor (`GO` turns it on, `STOP` turns
+it off) and a **Channel N cue** event that records every `GO`, `STOP`, and `FIRE`.
 
 **The easy way is the blueprint.** It ties one channel to one target with three pickers,
 handles GO, STOP, and FIRE, and is safe across restarts:
@@ -122,38 +122,57 @@ handles GO, STOP, and FIRE, and is safe across restarts:
 The examples below are for people who want to write their own. Two rules apply to any
 automation triggered by a channel:
 
-- **Do not use `mode: single`** on an automation triggered by a fire event. Cues can
-  arrive several times a second, and `single` drops every cue that lands while the previous
-  one is still running. Use `mode: parallel` (or `queued` if order matters more than
-  timing).
-- **Trigger STOP on `from: "on"` to `to: "off"`**, not on `to: "off"` alone, so a restart
-  that brings the sensor from `unavailable` does not switch things off.
+- **Do not use `mode: single`** on an automation triggered by cues. Cues can arrive
+  several times a second, and `single` drops every cue that lands while the previous one
+  is still running. Use `mode: parallel` (or `queued` if order matters more than timing).
+- **Exclude availability transitions** (`not_from` / `not_to` `unavailable`, `unknown`)
+  so a restart or reload never fires a cue or switches things off.
 
 ```yaml
-alias: Cue 1 lights
+alias: Channel 1 lights
 mode: parallel
 triggers:
   - trigger: state
-    entity_id: binary_sensor.piano_show_control_msc_channel_1
-    to: "on"
-actions:
-  - action: light.turn_on
-    target:
-      entity_id: light.stage
-```
-
-```yaml
-alias: Cue 2 fog
-mode: parallel
-triggers:
-  - trigger: state
-    entity_id: event.piano_show_control_msc_channel_2_fire
+    entity_id: event.piano_show_control_channel_1_cue
     not_from: [unavailable, unknown]
     not_to: [unavailable, unknown]
 actions:
-  - action: scene.turn_on
+  - choose:
+      - conditions: "{{ trigger.to_state.attributes.event_type == 'go' }}"
+        sequence:
+          - action: scene.turn_on
+            target:
+              entity_id: scene.purple_wash
+      - conditions: "{{ trigger.to_state.attributes.event_type == 'stop' }}"
+        sequence:
+          - action: light.turn_off
+            target:
+              entity_id: light.wall_wash_dimming
+      - conditions: "{{ trigger.to_state.attributes.event_type == 'fire' }}"
+        sequence:
+          - action: scene.turn_on
+            target:
+              entity_id: scene.fog_burst
+```
+
+If you only need the on/off state, the binary sensor is simpler:
+
+```yaml
+alias: Channel 2 pump
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.piano_show_control_channel_2
+    to: "on"
+    id: go
+  - trigger: state
+    entity_id: binary_sensor.piano_show_control_channel_2
+    from: "on"
+    to: "off"
+    id: stop
+actions:
+  - action: "switch.turn_{{ 'on' if trigger.id == 'go' else 'off' }}"
     target:
-      entity_id: scene.fog
+      entity_id: switch.fountain_pump
 ```
 
 For every valid cue, including channels outside your configured range, Home Assistant
