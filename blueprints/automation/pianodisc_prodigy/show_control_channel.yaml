@@ -1,5 +1,5 @@
 blueprint:
-  name: PianoDisc show control channel
+  name: PianoDisc MSC cue
   description: >-
     Tie one MIDI Show Control channel of a PianoDisc Prodigy II to lights, switches,
     scenes or scripts. GO turns them on, STOP turns them off, and FIRE flashes them.

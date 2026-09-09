@@ -234,7 +234,7 @@ Use the blueprint to wire a channel without writing YAML:
 [![Import the show control blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FPianoDisc%2Fpianodisc_prodigy%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fpianodisc_prodigy%2Fshow_control_channel.yaml)
 
 Then, for each channel you use, **Settings → Automations → Create automation**, pick
-**PianoDisc show control channel**, and fill it in:
+**PianoDisc MSC cue**, and fill it in:
 
 1. **Channel** — the channel's cue event, for example *Channel 1 cue*.
 2. **On** — the lights, switches, scene, or script this channel turns on.
