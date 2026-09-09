@@ -1124,6 +1124,9 @@ class MqttTransport(Transport):
         self._data = self._data.merge(state=self._derive_state())
         return self._data
 
+    def invalidate_device_info(self) -> None:
+        self._http_device_info_seen = False
+
     def set_library_progress_listener(self, listener) -> None:
         # The scan runs on the composed HTTP transport, so forward progress there.
         super().set_library_progress_listener(listener)

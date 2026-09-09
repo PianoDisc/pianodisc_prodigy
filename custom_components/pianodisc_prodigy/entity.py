@@ -78,3 +78,23 @@ class PianoDiscShowControlEntity(PianoDiscEntity):
             manufacturer=MANUFACTURER,
             name=f"{piano_name} Show Control",
         )
+
+
+class PianoDiscAutoPlayEntity(PianoDiscEntity):
+    """Entity on the piano's AutoPlay sub-device.
+
+    AutoPlay is four related settings. Grouping them on their own device keeps
+    the entity names short ("Playlist", "Loop") instead of prefixing each one.
+    """
+
+    def __init__(self, coordinator: PianoDiscCoordinator) -> None:
+        super().__init__(coordinator)
+        entry = coordinator.config_entry
+        device_id = entry.unique_id or entry.data[CONF_DEVICE_ID]
+        piano_name = coordinator.data.device_name or entry.title
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{device_id}_autoplay")},
+            via_device=(DOMAIN, device_id),
+            manufacturer=MANUFACTURER,
+            name=f"{piano_name} AutoPlay",
+        )

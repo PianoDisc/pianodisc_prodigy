@@ -111,12 +111,10 @@ One **PianoDisc Prodigy II** device with these controls:
 | **Status** | Whether the piano has finished starting up and is safe to play |
 | **Stop** | A dedicated Stop button for dashboards where Home Assistant hides the media-player Stop control |
 | **Refresh library** | Re-scan the SD card after you add or remove songs |
+| **Refresh device info** | Re-read the piano's serial number, hardware version, and Wi-Fi signal |
 | **Reboot** | Restart the piano |
 | **Power** | Direct control of a linked, dedicated smart plug or outlet |
-| **AutoPlay** | Enable the automatic playlist after startup |
-| **AutoPlay playlist** | Select the playlist AutoPlay uses |
-| **AutoPlay playback order** | Use the playlist default, sequence, or shuffle order |
-| **AutoPlay loop** | Repeat the AutoPlay playlist continuously |
+| **AutoPlay** (sub-device) | **Enabled**, **Playlist**, **Playback order**, and **Loop** for the playlist that starts automatically after power-up |
 | **Audio firmware** / **MIDI firmware** | Shows whether newer firmware is available |
 
 ## Recommended dashboard
@@ -155,8 +153,10 @@ entity: media_player.living_room_piano
 After installing or upgrading the integration, reload the browser page before adding these
 cards from the card picker.
 
-Add the four **AutoPlay** entities to an Entities card alongside it. They are ordinary
-configuration entities, so they can also be used directly in automations and voice control.
+AutoPlay has its own device under the piano, with an **Enabled** switch and the
+**Playlist**, **Playback order**, and **Loop** settings. Add them to an Entities card
+alongside the player; they are ordinary entities, so they also work in automations and
+voice control.
 
 For what each entity reports and when it's unavailable, see the
 [entity reference](docs/entities.md).

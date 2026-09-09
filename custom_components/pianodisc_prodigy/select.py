@@ -9,7 +9,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import CONF_DEVICE_ID
 from .coordinator import PianoDiscConfigEntry, PianoDiscCoordinator
-from .entity import PianoDiscEntity
+from .entity import PianoDiscAutoPlayEntity, PianoDiscEntity
 
 PARALLEL_UPDATES = 1
 
@@ -94,7 +94,7 @@ class PianoDiscPlaylistSelect(PianoDiscEntity, SelectEntity):
             self.coordinator.async_set_updated_data(data.merge(**changes))
 
 
-class _PianoDiscAutoPlaySelect(PianoDiscEntity, SelectEntity):
+class _PianoDiscAutoPlaySelect(PianoDiscAutoPlayEntity, SelectEntity):
     """Shared availability and startup fetch for AutoPlay configuration selects."""
 
     _attr_entity_category = EntityCategory.CONFIG

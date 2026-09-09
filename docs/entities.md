@@ -99,6 +99,21 @@ remembered across Home Assistant restarts.
 
 Playlists and AutoPlay are not affected; they always play through.
 
+## AutoPlay (sub-device)
+
+AutoPlay starts a playlist by itself after the piano powers up, for showrooms and
+hospitality settings. Its four settings live on their own device under the piano:
+
+| Entity | Type | Meaning |
+|---|---|---|
+| **Enabled** | switch | Start the AutoPlay playlist after power-up |
+| **Playlist** | select | Which playlist AutoPlay plays |
+| **Playback order** | select | The playlist's default order, sequence, or shuffle |
+| **Loop** | switch | Start the playlist again when it ends |
+
+The settings are stored on the piano's SD card and take effect at the next power-up.
+They are unavailable until the piano has finished its library sync.
+
 ## Show Control (sub-device)
 
 When MQTT is available, the piano can turn MIDI Show Control cues embedded in a MIDI file
@@ -151,7 +166,14 @@ Re-scans the SD card. Press it after adding or removing songs.
 The scan runs in the background and posts a notification that tracks its progress, so you
 can carry on using Home Assistant while it works.
 
-*Configuration entity.*
+*Diagnostic entity.*
+
+## Refresh device info (button)
+
+Re-reads the piano's debug information: serial number, hardware version, Wi-Fi signal,
+SSID, and Bluetooth name. These are otherwise read once when the piano comes online.
+
+*Diagnostic entity.*
 
 ## Stop (button)
 
@@ -180,10 +202,10 @@ together. After an update you can confirm the versions on the piano's LCD screen
 Both stay available when the piano is offline, since they report the last known versions
 rather than live state.
 
-## Piano Playlists (sidebar panel)
+## Playlist editing
 
-Not an entity — a page in the Home Assistant sidebar for creating and editing the piano's
-playlists. See [SD card, MIDI files and playlists](sd-card.md).
+Not an entity — the **PianoDisc Playlists** custom card edits the piano's playlists from
+any dashboard. See [SD card, MIDI files and playlists](sd-card.md).
 
 ## Actions
 

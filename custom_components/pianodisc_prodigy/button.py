@@ -1,4 +1,4 @@
-"""Buttons: stop playback, reboot the piano, and refresh the SD-card library."""
+"""Buttons: stop, reboot, refresh the SD-card library, refresh device info."""
 
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ async def async_setup_entry(
             PianoDiscStopPlaybackButton(entry.runtime_data),
             PianoDiscRebootButton(entry.runtime_data),
             PianoDiscRefreshLibraryButton(entry.runtime_data),
+            PianoDiscRefreshDeviceInfoButton(entry.runtime_data),
         ]
     )
 
@@ -69,7 +70,7 @@ class PianoDiscRefreshLibraryButton(PianoDiscEntity, ButtonEntity):
     """Re-scans the SD-card song library (press after changing the card's contents)."""
 
     _attr_translation_key = "refresh_library"
-    _attr_entity_category = EntityCategory.CONFIG
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:refresh"
 
     def __init__(self, coordinator: PianoDiscCoordinator) -> None:
@@ -99,3 +100,22 @@ class PianoDiscRefreshLibraryButton(PianoDiscEntity, ButtonEntity):
             self.coordinator.async_refresh_library(),
             "pianodisc_prodigy_library_refresh",
         )
+
+
+class PianoDiscRefreshDeviceInfoButton(PianoDiscEntity, ButtonEntity):
+    """Re-reads the piano's debug JSON (serial, hardware, Wi-Fi signal, ...)."""
+
+    _attr_translation_key = "refresh_device_info"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:information-outline"
+
+    def __init__(self, coordinator: PianoDiscCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = (
+            coordinator.config_entry.unique_id
+            or coordinator.config_entry.data[CONF_DEVICE_ID]
+        )
+        self._attr_unique_id = f"{device_id}_refresh_device_info"
+
+    async def async_press(self) -> None:
+        await self.coordinator.async_refresh_device_info()

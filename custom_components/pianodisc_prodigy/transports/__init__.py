@@ -82,6 +82,9 @@ class Transport(ABC):
         """
         return None
 
+    def invalidate_device_info(self) -> None:  # noqa: B027 - optional hook
+        """Forget cached device metadata so the next snapshot re-reads it."""
+
     # -- push (push transports override; pollers leave the default no-op) ----
     def set_push_listener(self, listener: PushListener) -> None:
         """Register the coordinator callback for out-of-band state changes."""
