@@ -1018,8 +1018,8 @@ class PianoDiscPlaylistCardEditor extends HTMLElement {
   }
 }
 
-customElements.define("pianodisc-playlist-card", PianoDiscPlaylistCard);
-customElements.define("pianodisc-playlist-card-editor", PianoDiscPlaylistCardEditor);
+if (!customElements.get("pianodisc-playlist-card")) customElements.define("pianodisc-playlist-card", PianoDiscPlaylistCard);
+if (!customElements.get("pianodisc-playlist-card-editor")) customElements.define("pianodisc-playlist-card-editor", PianoDiscPlaylistCardEditor);
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "pianodisc-playlist-card",

@@ -9,7 +9,6 @@ import voluptuous as vol
 
 from homeassistant.components import mqtt
 from homeassistant.components.frontend import (
-    DATA_EXTRA_MODULE_URL,
     add_extra_js_url,
     async_remove_panel,
     remove_extra_js_url,
@@ -170,15 +169,17 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
     ):
         async_remove_panel(hass, legacy_panel, warn_if_unknown=False)
     if data.get("frontend_registered"):
-        hass.data.setdefault(DATA_EXTRA_MODULE_URL, set())
         for module_url in module_urls:
             add_extra_js_url(hass, module_url)
         return
     await async_setup_component(hass, "http", {})
     await async_setup_component(hass, "frontend", {})
-    hass.data.setdefault(DATA_EXTRA_MODULE_URL, set())
     for module_url in module_urls:
         add_extra_js_url(hass, module_url)
+    # Earlier builds also wrote a Lovelace resource entry for each module. With
+    # the extra-module route above, that entry loads every card twice, and the
+    # second load throws when it re-defines the custom elements.
+    await _async_cleanup_legacy_lovelace_resources(hass)
     async_register_websocket_api(hass)
     await hass.http.async_register_static_paths(
         [
@@ -230,13 +231,15 @@ async def async_unload_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -
     """Unload a config entry."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
-        coordinators = hass.data.get(DOMAIN, {}).get(DATA_COORDINATORS, {})
+        data = hass.data.get(DOMAIN, {})
+        coordinators = data.get(DATA_COORDINATORS, {})
         coordinators.pop(entry.entry_id, None)
         if not coordinators:
-            module_urls = hass.data.setdefault(DATA_EXTRA_MODULE_URL, set())
             for module_url in _card_module_urls():
-                if module_url in module_urls:
+                try:
                     remove_extra_js_url(hass, module_url)
+                except Exception:  # noqa: BLE001 - never let a frontend hiccup wedge unload
+                    LOGGER.debug("Could not unregister card module %s", module_url)
             await _async_cleanup_legacy_lovelace_resources(hass)
     return unloaded
 

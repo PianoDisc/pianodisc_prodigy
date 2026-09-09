@@ -256,7 +256,7 @@ class PianoDiscLibraryCardEditor extends HTMLElement {
   }
 }
 
-customElements.define("pianodisc-library-card", PianoDiscLibraryCard);
-customElements.define("pianodisc-library-card-editor", PianoDiscLibraryCardEditor);
+if (!customElements.get("pianodisc-library-card")) customElements.define("pianodisc-library-card", PianoDiscLibraryCard);
+if (!customElements.get("pianodisc-library-card-editor")) customElements.define("pianodisc-library-card-editor", PianoDiscLibraryCardEditor);
 window.customCards = window.customCards || [];
-window.customCards.push({ type: "pianodisc-library-card", name: "PianoDisc Library", description: "Search and play the cached PianoDisc music library.", preview: false });
+if (!window.customCards.some((c) => c.type === "pianodisc-library-card")) window.customCards.push({ type: "pianodisc-library-card", name: "PianoDisc Library", description: "Search and play the cached PianoDisc music library.", preview: false });
