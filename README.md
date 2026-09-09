@@ -223,8 +223,9 @@ does not prevent the separate **Power** switch from controlling a known outlet.
 
 MIDI files authored with the PianoDisc MSC Cue Editor carry MIDI Show Control cues. The
 piano publishes them as they play, and the integration turns them into eight numbered
-**channels** on the piano's Show Control device. A `GO` cue turns a channel on, `STOP`
-turns it off, and `FIRE` pulses it. Channel numbers mean the same thing in every song, so
+**channels** on the piano's Show Control device. Each channel has an on/off state
+(`GO` turns it on, `STOP` turns it off) and a **cue** event that records every `GO`,
+`STOP`, and `FIRE` as it arrives. Channel numbers mean the same thing in every song, so
 you tie each channel to a device once and every cue file just works. Needs
 [MQTT](docs/mqtt.md).
 
@@ -235,11 +236,10 @@ Use the blueprint to wire a channel without writing YAML:
 Then, for each channel you use, **Settings → Automations → Create automation**, pick
 **PianoDisc show control channel**, and fill it in:
 
-1. **MSC channel** — the channel's sensor, for example *MSC channel 1*.
-2. **MSC channel fire** — the same channel's fire event, *MSC channel 1 fire*.
-3. **On GO** — what happens when the channel turns on.
-4. **On STOP** — what happens when it turns off.
-5. **On FIRE** — optional; what each FIRE cue does.
+1. **Channel** — the channel's cue event, for example *Channel 1 cue*.
+2. **On GO** — what happens when the channel turns on.
+3. **On STOP** — what happens when it turns off.
+4. **On FIRE** — optional; what each FIRE cue does.
 
 GO, STOP, and FIRE are ordinary action lists, built with the same editor as any
 automation, so a channel can drive anything:

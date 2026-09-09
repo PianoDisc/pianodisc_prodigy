@@ -117,8 +117,17 @@ They are unavailable until the piano has finished its library sync.
 ## Show Control (sub-device)
 
 When MQTT is available, the piano can turn MIDI Show Control cues embedded in a MIDI file
-into Home Assistant automation triggers. Cue number N is channel N: `GO 001` turns on
-**MSC channel 1**, `STOP 001` turns it off, and `FIRE 001` triggers **MSC channel 1 fire**.
+into Home Assistant automation triggers. Cue number N is channel N, and each channel has
+two entities:
+
+| Entity | Type | Meaning |
+|---|---|---|
+| **Channel N** | binary sensor | `on` after a `GO` cue, `off` after `STOP` |
+| **Channel N cue** | event | Every cue that reached the channel, in order. Event type `go`, `stop`, or `fire`, with the cue number in the `cue` attribute |
+
+Automations trigger on the cue event; the binary sensor is for dashboards and
+conditions. The event entity's history is also the quickest way to check what a cue file
+actually sent.
 
 Choose the number of channels in the integration's **Options** (`msc_channels`, default
 8; 0 removes these entities). Channel states turn off a few seconds after a song ends or

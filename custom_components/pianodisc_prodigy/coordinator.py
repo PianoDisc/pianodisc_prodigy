@@ -56,9 +56,9 @@ type PianoDiscConfigEntry = ConfigEntry[PianoDiscCoordinator]
 _HA_DOMAIN = "homeassistant"
 
 
-def msc_fire_signal(entry_id: str, channel: int) -> str:
-    """Return the dispatcher signal for one entry's MSC FIRE channel."""
-    return f"{DOMAIN}_{entry_id}_msc_fire_{channel}"
+def msc_cue_signal(entry_id: str, channel: int) -> str:
+    """Return the dispatcher signal carrying one channel's GO/STOP/FIRE cues."""
+    return f"{DOMAIN}_{entry_id}_msc_cue_{channel}"
 
 
 def _format_device_sw_version(data: ProdigyData) -> str | None:
@@ -256,13 +256,15 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
             if 1 <= parsed <= self.msc_channel_count:
                 channel = parsed
         handled = channel is not None and command in {"GO", "STOP", "FIRE"}
-        if command in {"GO", "STOP"} and channel is not None:
-            self.msc_channel_states[channel] = command == "GO"
-            self.async_update_listeners()
-        elif command == "FIRE" and channel is not None:
+        if handled:
+            if command in {"GO", "STOP"}:
+                self.msc_channel_states[channel] = command == "GO"
+                self.async_update_listeners()
+            # Every handled cue also reaches the channel's cue event entity.
             async_dispatcher_send(
                 self.hass,
-                msc_fire_signal(self.config_entry.entry_id, channel),
+                msc_cue_signal(self.config_entry.entry_id, channel),
+                command,
                 cue,
             )
         device_id = self.config_entry.unique_id or self.config_entry.data[CONF_DEVICE_ID]
