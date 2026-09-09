@@ -13,6 +13,14 @@ The main control surface. Shows what's playing, how far through it is, and the v
 **Supports:** play, pause, stop, next track, previous track, volume set, volume up/down,
 mute, shuffle, and browsing the SD-card library.
 
+**Previous track** restarts the current song when it is more than a few seconds in,
+and goes back a song otherwise, like most media players. Inside a playlist or AutoPlay
+run it always goes back a song, so the run is not interrupted.
+
+**Stop** is not shown by Home Assistant's media-control card when a player supports
+pause; use the `media_player.media_stop` action, or a Tile card with the media
+playback feature, if you need it on a dashboard.
+
 Power on/off appears only when you've [linked a power outlet](../README.md#link-a-power-outlet).
 
 ### States
