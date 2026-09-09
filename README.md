@@ -237,19 +237,19 @@ Then, for each channel you use, **Settings → Automations → Create automation
 **PianoDisc show control channel**, and fill it in:
 
 1. **Channel** — the channel's cue event, for example *Channel 1 cue*.
-2. **On** — what "on" means for this channel.
-3. **Off** — what "off" means for it.
+2. **On** — the lights, switches, scene, or script this channel turns on.
+3. **Off** — optional; something to activate when the channel turns off, such as an
+   "off" scene. Leave it empty and the On items are simply turned off.
 4. **Flash length** — how long a FIRE holds the channel on, default 100 ms.
 
-GO runs On, STOP runs Off, and FIRE flashes: On, wait, Off. A flash while the channel is
-already on leaves it on. On and Off are ordinary action lists, built with the same editor
-as any automation, so a channel can drive anything:
+GO turns On on, STOP turns it off, and FIRE flashes: on, wait, off. A flash while the
+channel is already on leaves it on.
 
 | Device | On | Off |
 |---|---|---|
-| A floor lamp | *Light: Turn on* the lamp | *Light: Turn off* the lamp |
-| A pump or fountain | *Switch: Turn on* | *Switch: Turn off* |
-| A DMX fixture, "purple wash" | *Scene: Activate* → **Purple wash** | *Scene: Activate* → **Wash off** |
+| A floor lamp | the lamp | *(empty)* |
+| A pump or fountain | the pump switch | *(empty)* |
+| A DMX fixture, "purple wash" | scene **Purple wash** | scene **Wash off** |
 
 For a DMX fixture, make the scene first: set the fixture's dimmer, colour, and effect
 entities exactly how you want them, then **Settings → Automations → Scenes → Add scene**
