@@ -69,6 +69,16 @@ class PianoDiscMscCue(PianoDiscShowControlEntity, EventEntity):
             )
         )
 
+    @property
+    def extra_state_attributes(self) -> dict[str, bool]:
+        # Live channel state, so a blueprint with only this entity picked can tell
+        # whether a FIRE flash should restore to on or to off.
+        return {
+            "channel_on": bool(
+                self.coordinator.msc_channel_states.get(self._channel, False)
+            )
+        }
+
     @callback
     def _handle_cue(self, command: str, cue: str) -> None:
         self._trigger_event(command.lower(), {"cue": cue})

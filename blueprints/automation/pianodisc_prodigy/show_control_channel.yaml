@@ -2,11 +2,12 @@ blueprint:
   name: PianoDisc show control channel
   description: >-
     Tie one MIDI Show Control channel of a PianoDisc Prodigy II to anything in Home
-    Assistant. Pick the channel, then choose what happens on its GO cue, on STOP, and
-    optionally on each FIRE cue. Each is an ordinary action list: turn a lamp on, start
-    a pump, activate a scene that sets a DMX fixture to a colour, run a script. Create
-    one automation from this blueprint for each channel you use; channel numbers mean
-    the same thing in every song.
+    Assistant. Pick the channel, then say what "on" and "off" mean for it: turn a lamp
+    on and off, start and stop a pump, activate a scene that sets a DMX fixture to a
+    colour and another that clears it. GO runs the on actions, STOP runs the off
+    actions, and FIRE flashes: on, wait, off. Create one automation from this
+    blueprint for each channel you use; channel numbers mean the same thing in every
+    song.
   domain: automation
   author: PianoDisc
   source_url: https://github.com/PianoDisc/pianodisc_prodigy/blob/main/blueprints/automation/pianodisc_prodigy/show_control_channel.yaml
@@ -21,28 +22,34 @@ blueprint:
           filter:
             integration: pianodisc_prodigy
             domain: event
-    go_actions:
-      name: On GO
+    on_actions:
+      name: On
       description: >-
-        What happens when the channel turns on. For a lamp or a pump, a turn-on action.
-        For a DMX fixture, activate a scene that sets its brightness and colour.
+        What "on" means for this channel. Runs on GO, and at the start of a FIRE flash.
+        For a lamp or a pump, a turn-on action. For a DMX fixture, activate a scene
+        that sets its brightness and colour.
       default: []
       selector:
         action: {}
-    stop_actions:
-      name: On STOP
-      description: What happens when the channel turns off. Usually the reverse of GO.
-      default: []
-      selector:
-        action: {}
-    fire_actions:
-      name: On FIRE
+    off_actions:
+      name: Off
       description: >-
-        What happens on each FIRE cue. A flash, a scene, a script. Leave empty on
-        channels that never fire.
+        What "off" means for this channel. Runs on STOP, and at the end of a FIRE
+        flash unless the channel is on. Usually the reverse of On.
       default: []
       selector:
         action: {}
+    flash_ms:
+      name: Flash length
+      description: How long a FIRE cue holds the channel on before running Off.
+      default: 100
+      selector:
+        number:
+          min: 20
+          max: 5000
+          step: 10
+          unit_of_measurement: ms
+          mode: box
 
 # Parallel so a burst of FIRE cues never delays the GO or STOP that follows it.
 mode: parallel
@@ -61,14 +68,24 @@ triggers:
       - unknown
 
 variables:
+  channel: !input channel
   command: "{{ trigger.to_state.attributes.event_type }}"
   cue: "{{ trigger.to_state.attributes.cue | default('') }}"
 
 actions:
   - choose:
       - conditions: "{{ command == 'go' }}"
-        sequence: !input go_actions
+        sequence: !input on_actions
       - conditions: "{{ command == 'stop' }}"
-        sequence: !input stop_actions
+        sequence: !input off_actions
       - conditions: "{{ command == 'fire' }}"
-        sequence: !input fire_actions
+        sequence:
+          - sequence: !input on_actions
+          - delay:
+              milliseconds: !input flash_ms
+          # A flash while the channel is on (a GO is active) leaves it on.
+          - if:
+              - condition: template
+                value_template: "{{ not state_attr(channel, 'channel_on') }}"
+            then:
+              - sequence: !input off_actions
