@@ -109,7 +109,7 @@ One **PianoDisc Prodigy II** device with these controls:
 | **Show Control** | Optional MSC cue channels and FIRE events from MSC-enabled MIDI files — [needs MQTT](docs/mqtt.md) |
 | **Library** | How many songs are on the SD card, and whether a scan is running |
 | **Status** | Whether the piano has finished starting up and is safe to play |
-| **Stop** | A dedicated Stop button for dashboards where Home Assistant hides the media-player Stop control |
+| **Stop** | A dedicated Stop button that also works while the piano is still starting up, when AutoPlay may already be playing |
 | **Refresh library** | Re-scan the SD card after you add or remove songs |
 | **Refresh device info** | Re-read the piano's serial number, hardware version, and Wi-Fi signal |
 | **Reboot** | Restart the piano |
