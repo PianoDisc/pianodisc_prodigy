@@ -7,3 +7,6 @@ __pycache__/
 .venv/
 venv/
 *.log
+# Test MIDI files never belong in the repo
+*.mid
+*.midi
