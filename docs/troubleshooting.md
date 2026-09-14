@@ -132,7 +132,7 @@ fixes it; press **Refresh library** afterwards.
 ## The playlist control is unavailable
 
 It has no playlists to offer. Either the piano is offline, or no playlists exist yet.
-Create one in the **Piano Playlists** sidebar panel.
+Create one with the **Piano Playlist** card on a dashboard (see [SD card, MIDI files and playlists](sd-card.md)).
 
 ## Playback state looks stale
 

@@ -67,11 +67,11 @@ order, and **Example List**, a demo you can edit or delete.
 
 ### Editing them from Home Assistant
 
-Open **Piano Playlists** in the Home Assistant sidebar. This is the easiest way to work
-with playlists — the piano has no built-in playlist editor, and editing the file on the
+Add the **Piano Playlist** card to a dashboard (edit the dashboard, **Add card**, search
+for "PianoDisc"). This is the easiest way to work with playlists — the piano has no built-in playlist editor, and editing the file on the
 card by hand is easy to get wrong.
 
-<!-- SCREENSHOT: the Piano Playlists panel with a playlist open -->
+<!-- SCREENSHOT: the Piano Playlist card with a playlist open -->
 
 Each playlist has:
 
@@ -103,7 +103,7 @@ Three ways:
 ### The file behind it
 
 Playlists are stored on the card as `playlists.json`. You don't need to touch this — the
-sidebar panel is there so you don't have to — but if you're curious or need to inspect it:
+playlist card is there so you don't have to — but if you're curious or need to inspect it:
 
 ```json
 [{

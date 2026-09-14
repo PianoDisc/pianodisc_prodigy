@@ -57,7 +57,7 @@ position within the current list and how many songs it holds.
 Lists the playlists on the SD card. Choosing one starts it playing right away.
 
 Unavailable when the piano hasn't reported any playlists — either because it's offline, or
-because there are none yet. Create playlists from the **Piano Playlists** sidebar panel;
+because there are none yet. Create playlists with the **Piano Playlist** card on a dashboard;
 see [SD card, MIDI files and playlists](sd-card.md).
 
 ## Busy (binary sensor)
