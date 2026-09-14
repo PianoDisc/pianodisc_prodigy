@@ -23,6 +23,7 @@ from homeassistant.core import (
     State,
     callback,
 )
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
@@ -666,6 +667,44 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
     async def async_power_on(self) -> None:
         """Turn on the linked outlet; piano reconnection continues in background."""
         await self.async_set_outlet_power(True)
+
+    @property
+    def playback_ready(self) -> bool:
+        """Whether a playback command sent now would be acted on."""
+        data = self.data
+        return (
+            data is not None
+            and data.available
+            and data.readiness in {"READY", "OK"}
+            and not self.library_initializing
+        )
+
+    async def async_wait_until_playback_ready(self, timeout: float) -> None:
+        """Block until the piano reports ready, or raise after ``timeout`` seconds.
+
+        Used by play commands issued while the piano is off or still booting: the
+        outlet returns immediately, and a command sent before the MIDI engine is
+        ready is simply dropped by the firmware.
+        """
+        if self.playback_ready:
+            return
+        ready = asyncio.Event()
+
+        @callback
+        def _check() -> None:
+            if self.playback_ready:
+                ready.set()
+
+        unsubscribe = self.async_add_listener(_check)
+        try:
+            async with asyncio.timeout(timeout):
+                await ready.wait()
+        except TimeoutError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="power_on_timeout"
+            ) from err
+        finally:
+            unsubscribe()
 
     async def async_power_off(self) -> None:
         """Stop only a confirmed live player, then always cut the outlet power."""

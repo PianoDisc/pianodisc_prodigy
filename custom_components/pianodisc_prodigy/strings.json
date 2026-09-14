@@ -164,6 +164,9 @@
     },
     "debug_info_unavailable": {
       "message": "The piano did not return debug information."
+    },
+    "power_on_timeout": {
+      "message": "The piano did not become ready in time. Check that it is powered and connected, then try again."
     }
   }
 }
