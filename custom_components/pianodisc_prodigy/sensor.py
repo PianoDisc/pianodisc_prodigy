@@ -135,16 +135,9 @@ class PianoDiscStatusSensor(PianoDiscEntity, SensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_icon = "mdi:piano"
-    _attr_options = [
-        "unknown",
-        "STARTING",
-        "WARMING_UP",
-        "SYNCING",
-        "READY",
-        "OK",
-        "OFFLINE",
-        "NO_SD",
-    ]
+    # The words the MIDI engine reports (relayed by the ESP32 on .../ready), as
+    # lowercase enum options. OFFLINE is the MQTT last-will. Anything else is unknown.
+    _attr_options = ["warming_up", "ready", "offline", "no_sd", "fault"]
 
     def __init__(self, coordinator: PianoDiscCoordinator) -> None:
         super().__init__(coordinator)
@@ -159,8 +152,11 @@ class PianoDiscStatusSensor(PianoDiscEntity, SensorEntity):
         return True
 
     @property
-    def native_value(self) -> str:
-        return self.coordinator.data.readiness
+    def native_value(self) -> str | None:
+        readiness = self.coordinator.data.readiness
+        # Older firmware said OK where the current engine says READY.
+        option = "ready" if readiness in {"READY", "OK"} else readiness.lower()
+        return option if option in self._attr_options else None
 
     @property
     def extra_state_attributes(self) -> dict[str, str]:

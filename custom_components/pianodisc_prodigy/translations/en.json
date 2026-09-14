@@ -99,14 +99,11 @@
       "status": {
         "name": "Status",
         "state": {
-          "unknown": "Unknown",
-          "STARTING": "Starting",
-          "WARMING_UP": "Warming up",
-          "SYNCING": "Syncing library",
-          "READY": "Ready",
-          "OK": "Ready",
-          "OFFLINE": "Offline",
-          "NO_SD": "No SD card"
+          "warming_up": "Warming up",
+          "ready": "Ready",
+          "offline": "Offline",
+          "no_sd": "No SD card",
+          "fault": "Fault"
         },
         "state_attributes": {
           "library_status": { "name": "Library status" }
