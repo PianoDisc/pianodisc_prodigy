@@ -70,7 +70,8 @@ blueprint:
       name: Fade in
       description: >-
         Seconds a GO takes to bring lights and scenes up. 0 switches them on at once.
-        Only lights that support transitions fade; everything else switches.
+        A cue authored with its own fade in the cue editor overrides this. Only lights
+        that support transitions fade; everything else switches.
       default: 0
       selector:
         number:
@@ -83,7 +84,8 @@ blueprint:
       name: Fade out
       description: >-
         Seconds a STOP takes to bring lights down (and to bring any Off items up).
-        0 switches at once. FIRE never fades.
+        0 switches at once. A cue authored with its own fade overrides this. FIRE
+        never fades.
       default: 0
       selector:
         number:
@@ -112,10 +114,15 @@ triggers:
 
 variables:
   channel: !input channel
+  fade_in_default: !input fade_in
+  fade_out_default: !input fade_out
   on_entities: !input on_entities
   off_entities: !input off_entities
-  fade_in: !input fade_in
-  fade_out: !input fade_out
+  # A cue authored with its own fade (cue 3.040 = channel 3, 4.0 s) arrives with a
+  # fade attribute and overrides the channel defaults below.
+  cue_fade: "{{ trigger.to_state.attributes.fade }}"
+  fade_in: "{{ cue_fade if cue_fade is number else fade_in_default }}"
+  fade_out: "{{ cue_fade if cue_fade is number else fade_out_default }}"
   # Only light.turn_on/off and scene.turn_on accept a transition, so lights and
   # scenes are addressed through their own services and the rest through the
   # generic ones.

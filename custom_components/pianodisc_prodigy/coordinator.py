@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import Awaitable, Callable
 
 from homeassistant.components import persistent_notification
@@ -56,6 +57,24 @@ type PianoDiscConfigEntry = ConfigEntry[PianoDiscCoordinator]
 # The generic turn_on/off service dispatches to the linked entity's own domain
 # (switch / input_boolean / light), so one call covers every supported power entity.
 _HA_DOMAIN = "homeassistant"
+
+
+_CUE_RE = re.compile(r"^(\d+)(?:\.(\d+))?$")
+
+
+def parse_cue(cue: str) -> tuple[int | None, float | None]:
+    """Split an MSC cue number into (channel, fade seconds).
+
+    The cue editor writes ``N`` for a plain cue on channel N and ``N.FFF`` for a
+    cue with a fade of FFF tenths of a second (``3.040`` = channel 3, 4.0 s). The
+    piano forwards the string untouched. Anything else is not a channel cue.
+    """
+    match = _CUE_RE.match(cue)
+    if match is None:
+        return None, None
+    channel = int(match.group(1))
+    tenths = match.group(2)
+    return channel, (int(tenths) / 10 if tenths is not None else None)
 
 
 def msc_cue_signal(entry_id: str, channel: int) -> str:
@@ -248,19 +267,27 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         self._flush_pending_stop(data)
 
     @callback
-    def handle_msc(self, command: str, cue: str) -> None:
-        """Apply one live MSC message and always publish its catch-all event."""
+    def handle_msc(self, command: str, cue: str, fade: float | None = None) -> None:
+        """Apply one live MSC message and always publish its catch-all event.
+
+        ``fade`` from the transport (timed-go firmware) wins over a fade encoded
+        in the cue number; FIRE never carries one.
+        """
         self._msc_seq += 1
+        parsed, cue_fade = parse_cue(cue)
+        if fade is None:
+            fade = cue_fade
+        if command == "FIRE":
+            fade = None
         self.last_msc = {
             "command": command,
             "cue": cue,
+            "fade": fade,
             "received_at": dt_util.utcnow().isoformat(),
         }
         channel = None
-        if cue.isdigit():
-            parsed = int(cue)
-            if 1 <= parsed <= self.msc_channel_count:
-                channel = parsed
+        if parsed is not None and 1 <= parsed <= self.msc_channel_count:
+            channel = parsed
         handled = channel is not None and command in {"GO", "STOP", "FIRE"}
         if handled:
             if command in {"GO", "STOP"}:
@@ -272,6 +299,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
                 msc_cue_signal(self.config_entry.entry_id, channel),
                 command,
                 cue,
+                fade,
             )
         device_id = self.config_entry.unique_id or self.config_entry.data[CONF_DEVICE_ID]
         self.hass.bus.async_fire(
@@ -282,6 +310,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
                 "command": command,
                 "cue": cue,
                 "channel": channel,
+                "fade": fade,
                 "handled": handled,
             },
         )

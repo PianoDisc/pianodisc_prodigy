@@ -187,6 +187,11 @@ triggers:
       cue: "042"
 ```
 
+A cue number may carry a fade: `3.040` is channel 3 with a 4.0 s fade (the digits after
+the dot are tenths of a second). The cue event and the bus event both expose it as `fade`
+in seconds, or `null` when the cue has none; `cue` is always the string as sent. FIRE cues
+never carry a fade.
+
 Its `device_id` is the piano's own device ID (the one in its MQTT topics and shown as the
 model ID on the device page), not Home Assistant's device registry ID.
 

@@ -35,7 +35,7 @@ LibraryProgressListener = Callable[[int, bool], None]
 
 #: A transport invokes this for each MSC cue. This is event-shaped, so it must not
 #: travel through ``ProdigyData`` where consecutive cues could be coalesced.
-MscListener = Callable[[str, str], None]
+MscListener = Callable[[str, str, float | None], None]
 
 
 class Transport(ABC):
@@ -111,9 +111,10 @@ class Transport(ABC):
         """Register the coordinator callback for individual MSC cue messages."""
         self._msc_listener = listener
 
-    def _emit_msc(self, command: str, cue: str) -> None:
+    def _emit_msc(self, command: str, cue: str, fade: float | None = None) -> None:
+        """Forward one cue; ``fade`` is a firmware-supplied time in seconds, if any."""
         if self._msc_listener is not None:
-            self._msc_listener(command, cue)
+            self._msc_listener(command, cue, fade)
 
     def invalidate(self) -> None:  # noqa: B027 - optional hook, default is a no-op
         """Drop cached liveness so the next snapshot re-seeds (after a power cycle).
