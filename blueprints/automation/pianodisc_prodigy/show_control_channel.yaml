@@ -66,6 +66,32 @@ blueprint:
           step: 10
           unit_of_measurement: ms
           mode: box
+    fade_in:
+      name: Fade in
+      description: >-
+        Seconds a GO takes to bring lights and scenes up. 0 switches them on at once.
+        Only lights that support transitions fade; everything else switches.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 60
+          step: 0.5
+          unit_of_measurement: s
+          mode: box
+    fade_out:
+      name: Fade out
+      description: >-
+        Seconds a STOP takes to bring lights down (and to bring any Off items up).
+        0 switches at once. FIRE never fades.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 60
+          step: 0.5
+          unit_of_measurement: s
+          mode: box
 
 # Parallel so a burst of FIRE cues never delays the GO or STOP that follows it.
 mode: parallel
@@ -88,6 +114,17 @@ variables:
   channel: !input channel
   on_entities: !input on_entities
   off_entities: !input off_entities
+  fade_in: !input fade_in
+  fade_out: !input fade_out
+  # Only light.turn_on/off and scene.turn_on accept a transition, so lights and
+  # scenes are addressed through their own services and the rest through the
+  # generic ones.
+  on_lights: "{{ on_entities | select('match', 'light\\.') | list }}"
+  on_scenes: "{{ on_entities | select('match', 'scene\\.') | list }}"
+  on_other: "{{ on_entities | reject('match', 'light\\.') | reject('match', 'scene\\.') | list }}"
+  off_lights: "{{ off_entities | select('match', 'light\\.') | list }}"
+  off_scenes: "{{ off_entities | select('match', 'scene\\.') | list }}"
+  off_other: "{{ off_entities | reject('match', 'light\\.') | reject('match', 'scene\\.') | list }}"
   # A scene cannot be turned off; STOP simply activates the Off items (if any) and
   # turns off whatever in On is not a scene.
   turn_off_entities: "{{ on_entities | reject('match', 'scene\\.') | list }}"
@@ -98,23 +135,58 @@ actions:
   - choose:
       - conditions: "{{ command == 'go' }}"
         sequence:
-          - if: "{{ on_entities | count > 0 }}"
+          - if: "{{ on_lights | count > 0 }}"
+            then:
+              - action: light.turn_on
+                target:
+                  entity_id: "{{ on_lights }}"
+                data:
+                  transition: "{{ fade_in }}"
+          - if: "{{ on_scenes | count > 0 }}"
+            then:
+              - action: scene.turn_on
+                target:
+                  entity_id: "{{ on_scenes }}"
+                data:
+                  transition: "{{ fade_in }}"
+          - if: "{{ on_other | count > 0 }}"
             then:
               - action: homeassistant.turn_on
                 target:
-                  entity_id: !input on_entities
+                  entity_id: "{{ on_other }}"
       - conditions: "{{ command == 'stop' }}"
         sequence:
-          - if: "{{ off_entities | count > 0 }}"
+          - if: "{{ off_lights | count > 0 }}"
+            then:
+              - action: light.turn_on
+                target:
+                  entity_id: "{{ off_lights }}"
+                data:
+                  transition: "{{ fade_out }}"
+          - if: "{{ off_scenes | count > 0 }}"
+            then:
+              - action: scene.turn_on
+                target:
+                  entity_id: "{{ off_scenes }}"
+                data:
+                  transition: "{{ fade_out }}"
+          - if: "{{ off_other | count > 0 }}"
             then:
               - action: homeassistant.turn_on
                 target:
-                  entity_id: !input off_entities
-          - if: "{{ turn_off_entities | count > 0 }}"
+                  entity_id: "{{ off_other }}"
+          - if: "{{ on_lights | count > 0 }}"
+            then:
+              - action: light.turn_off
+                target:
+                  entity_id: "{{ on_lights }}"
+                data:
+                  transition: "{{ fade_out }}"
+          - if: "{{ on_other | count > 0 }}"
             then:
               - action: homeassistant.turn_off
                 target:
-                  entity_id: "{{ turn_off_entities }}"
+                  entity_id: "{{ on_other }}"
       - conditions: "{{ command == 'fire' }}"
         sequence:
           - if: "{{ on_entities | count > 0 }}"
@@ -124,7 +196,8 @@ actions:
                   entity_id: !input on_entities
           - delay:
               milliseconds: !input flash_ms
-          # A flash while the channel is on (a GO is active) leaves it on.
+          # A flash while the channel is on (a GO is active) leaves it on. FIRE is
+          # always a hard on/off; the fade inputs do not apply.
           - if: "{{ not state_attr(channel, 'channel_on') }}"
             then:
               - if: "{{ off_entities | count > 0 }}"
