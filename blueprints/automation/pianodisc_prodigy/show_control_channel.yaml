@@ -9,7 +9,7 @@ blueprint:
   author: PianoDisc
   source_url: https://github.com/PianoDisc/pianodisc_prodigy/blob/main/blueprints/automation/pianodisc_prodigy/show_control_channel.yaml
   homeassistant:
-    min_version: 2024.10.0
+    min_version: 2026.3.0
   input:
     channel:
       name: Channel
@@ -73,21 +73,16 @@ max: 25
 
 triggers:
   # The cue event's state is the time of its last cue, so every cue is a state
-  # change. Exclude availability transitions so a restart or reload never triggers.
+  # change. A channel that has never received a cue is "unknown", so only the
+  # unavailable transitions are excluded (a restart or reload never triggers);
+  # not_to also keeps the trigger from firing on an attribute-only change.
   - trigger: state
     entity_id: !input channel
     not_from:
       - unavailable
-      - unknown
     not_to:
       - unavailable
       - unknown
-
-# The event entity also carries the channel's state as an attribute, and a state
-# trigger fires on attribute changes too. Only a new cue (a new timestamp) counts.
-conditions:
-  - condition: template
-    value_template: "{{ trigger.to_state.state != trigger.from_state.state }}"
 
 variables:
   channel: !input channel
