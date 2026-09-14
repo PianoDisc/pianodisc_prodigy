@@ -62,10 +62,9 @@ MQTT_TOPIC_PLAYLIST_STATE: Final = "playlist/state"
 MQTT_TOPIC_AUTOPLAY_REQUEST: Final = "autoplay/request"
 MQTT_TOPIC_AUTOPLAY_STATE: Final = "autoplay/state"
 
-# Availability payloads on .../ready. : firmware registers an MQTT Last-Will of
-# "OFFLINE" (retained) so the broker announces an ungraceful disconnect instantly;
-# the connect-time "OK" is retained too, so an HA restart reads availability at once.
-MQTT_PAYLOAD_ONLINE: Final = "OK"
+# .../ready carries the MIDI engine's readiness word (WARMING_UP, READY, NO_SD, FAULT),
+# retained, so an HA restart reads it at once. : firmware registers an MQTT
+# Last-Will of "OFFLINE" (retained) so the broker announces an ungraceful disconnect.
 MQTT_PAYLOAD_OFFLINE: Final = "OFFLINE"
 
 # MQTT discovery subscription (manifest "mqtt" key fires async_step_mqtt on this)
