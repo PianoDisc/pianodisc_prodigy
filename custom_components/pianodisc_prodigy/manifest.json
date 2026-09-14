@@ -4,6 +4,7 @@
   "after_dependencies": ["mqtt"],
   "codeowners": ["@pdengr"],
   "config_flow": true,
+  "dependencies": ["http", "frontend"],
   "dhcp": [
     { "hostname": "prodigy2-*" },
     { "hostname": "pianodisc-*" },
