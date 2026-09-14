@@ -28,7 +28,6 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import target as target_helpers
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
-from homeassistant.setup import async_setup_component
 
 from .const import (
     CONF_DEVICE_ID,
@@ -172,8 +171,6 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
         for module_url in module_urls:
             add_extra_js_url(hass, module_url)
         return
-    await async_setup_component(hass, "http", {})
-    await async_setup_component(hass, "frontend", {})
     for module_url in module_urls:
         add_extra_js_url(hass, module_url)
     # Earlier builds also wrote a Lovelace resource entry for each module. With
