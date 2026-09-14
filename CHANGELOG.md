@@ -17,6 +17,8 @@
   discovered device.
 - Status sensor: adds **Fault** (SD-card scan failed); options are lowercase and
   words no firmware sends are gone.
+- Blueprint: **Fade in** and **Fade out** inputs (seconds, default 0) so GO and STOP
+  ramp lights and scenes that support transitions; FIRE stays a hard flash.
 - The **Stop** button works while the piano is starting up: a press before the piano
   reports ready is held and sent the moment it is.
 - Single Play switch is always available, so automations can set it while the piano
