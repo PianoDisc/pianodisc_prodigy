@@ -17,10 +17,10 @@
   discovered device.
 - Status sensor: adds **Fault** (SD-card scan failed); options are lowercase and
   words no firmware sends are gone.
-- Blueprint: **Fade in** and **Fade out** inputs (seconds, default 0) so GO and STOP
-  ramp lights and scenes that support transitions; FIRE stays a hard flash.
-- A cue number of the form `N.FFF` carries a per-cue fade of FFF tenths of a second;
-  the cue event exposes it as `fade` and the blueprint uses it over the channel default.
+- Fades: a cue number of the form `N.FFF` carries a fade of FFF tenths of a second
+  (authored in the cue editor). The cue event exposes it as `fade`, and the blueprint
+  ramps lights and scenes that support transitions over it: GO up, STOP down. A plain
+  cue switches at once; FIRE never fades.
 - The **Stop** button works while the piano is starting up: a press before the piano
   reports ready is held and sent the moment it is.
 - Single Play switch is always available, so automations can set it while the piano
