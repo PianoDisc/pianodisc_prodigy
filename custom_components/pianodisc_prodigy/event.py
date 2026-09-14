@@ -80,6 +80,8 @@ class PianoDiscMscCue(PianoDiscShowControlEntity, EventEntity):
         }
 
     @callback
-    def _handle_cue(self, command: str, cue: str) -> None:
-        self._trigger_event(command.lower(), {"cue": cue})
+    def _handle_cue(self, command: str, cue: str, fade: float | None) -> None:
+        # ``fade`` is the seconds the cue asks lights to ramp over, or None when the
+        # cue carries no fade (the blueprint then uses its per-channel default).
+        self._trigger_event(command.lower(), {"cue": cue, "fade": fade})
         self.async_write_ha_state()

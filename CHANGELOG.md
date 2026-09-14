@@ -19,6 +19,8 @@
   words no firmware sends are gone.
 - Blueprint: **Fade in** and **Fade out** inputs (seconds, default 0) so GO and STOP
   ramp lights and scenes that support transitions; FIRE stays a hard flash.
+- A cue number of the form `N.FFF` carries a per-cue fade of FFF tenths of a second;
+  the cue event exposes it as `fade` and the blueprint uses it over the channel default.
 - The **Stop** button works while the piano is starting up: a press before the piano
   reports ready is held and sent the moment it is.
 - Single Play switch is always available, so automations can set it while the piano

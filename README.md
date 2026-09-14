@@ -241,7 +241,8 @@ Then, for each channel you use, **Settings → Automations → Create automation
 4. **Flash length** — how long a FIRE holds the channel on, default 100 ms.
 5. **Fade in** / **Fade out** — seconds a GO takes to bring the lights up and a STOP to
    bring them down. Default 0, which switches at once. Lights and scenes that support
-   transitions fade; switches and relays simply switch. FIRE never fades.
+   transitions fade; switches and relays simply switch. FIRE never fades. A cue given
+   its own fade in the cue editor overrides these for that one cue.
 
 GO turns On on, STOP turns it off, and FIRE flashes: on, wait, off. A flash while the
 channel is already on leaves it on. Cues reach Home Assistant about a second after the

@@ -280,10 +280,13 @@ class MqttTransport(Transport):
             cue = str(payload["cue"]).strip()
             if not command or not cue:
                 raise ValueError("empty command or cue")
+            # Reserved for firmware that forwards MSC timed-go: a fade in seconds.
+            fade = payload.get("fade")
+            fade = float(fade) if isinstance(fade, (int, float)) and fade >= 0 else None
         except (KeyError, TypeError, ValueError, json.JSONDecodeError) as err:
             LOGGER.debug("Ignoring malformed MSC message: %s", err)
             return
-        self._emit_msc(command, cue)
+        self._emit_msc(command, cue, fade)
 
     @callback
     def _avail(self, msg: ReceiveMessage) -> bool:
