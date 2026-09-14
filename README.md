@@ -179,8 +179,9 @@ data:
 `volume` and `restore_volume_after` are optional. By default, the piano stops after the
 requested song. Set `continue_after: true` to continue through the SD-card library after
 that song. With `restore_volume_after: true` the
-piano returns to its previous volume once the song has started, which is useful when one
-automation plays quietly and you don't want that to become the new normal.
+piano returns to its previous volume once the song has finished, which is useful when one
+automation plays quietly and you don't want that to become the new normal. If you change
+the volume yourself while the song plays, that change is kept.
 
 More examples — morning routine, evening wind-down, lighting, quiet hours — are in
 [automation examples](docs/automations.md).
