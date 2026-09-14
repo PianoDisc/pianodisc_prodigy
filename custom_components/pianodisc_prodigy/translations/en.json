@@ -127,7 +127,6 @@
       "refresh_device_info": { "name": "Refresh device info" }
     },
     "switch": {
-      "power": { "name": "Power" },
       "single_song": { "name": "Single play" },
       "autoplay": { "name": "Enabled" },
       "autoplay_loop": { "name": "Loop" }

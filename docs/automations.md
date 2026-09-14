@@ -187,7 +187,8 @@ triggers:
       cue: "042"
 ```
 
-Its `device_id` is the PianoDisc MAC-derived ID, not Home Assistant's device registry ID.
+Its `device_id` is the piano's own device ID (the one in its MQTT topics and shown as the
+model ID on the device page), not Home Assistant's device registry ID.
 
 ## Wait until the piano is ready before playing
 
