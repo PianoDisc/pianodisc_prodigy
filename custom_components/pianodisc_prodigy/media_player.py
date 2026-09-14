@@ -24,7 +24,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 import voluptuous as vol
 
-from .const import CONF_DEVICE_ID, DOMAIN, LOGGER, VOLUME_MAX
+from .const import CONF_DEVICE_ID, DOMAIN, LOGGER, POWER_ON_TIMEOUT, VOLUME_MAX
 from .coordinator import PianoDiscConfigEntry, PianoDiscCoordinator
 from .entity import PianoDiscEntity
 from .transports.http import title_from_path
@@ -653,9 +653,15 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         return self.coordinator.single_play
 
     async def _ensure_powered(self) -> None:
-        """Power on first when the piano is off but linked to an outlet."""
+        """Power on first when the piano is off, then wait until it can take a command.
+
+        The outlet call returns at once; the piano needs its boot and warm-up before
+        a Play is honoured, and the firmware drops commands that arrive earlier.
+        """
         if self.coordinator.power_linked and self.coordinator.power_on is False:
             await self.coordinator.async_power_on()
+        if not self.coordinator.playback_ready:
+            await self.coordinator.async_wait_until_playback_ready(POWER_ON_TIMEOUT)
 
     async def _command(self, coro) -> None:
         self._ensure_library_ready()
