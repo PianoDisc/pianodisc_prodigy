@@ -17,6 +17,8 @@
   discovered device.
 - Status sensor: adds **Fault** (SD-card scan failed); options are lowercase and
   words no firmware sends are gone.
+- The **Stop** button works while the piano is starting up: a press before the piano
+  reports ready is held and sent the moment it is.
 - Single Play switch is always available, so automations can set it while the piano
   is off.
 - Declares `http` and `frontend` as dependencies; default album art is the PianoDisc
