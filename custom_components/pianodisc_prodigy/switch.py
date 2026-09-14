@@ -88,6 +88,11 @@ class PianoDiscSingleSongSwitch(PianoDiscEntity, SwitchEntity, RestoreEntity):
         )
         self._attr_unique_id = f"{device_id}_single_song"
 
+    @property
+    def available(self) -> bool:
+        # The mode lives on the HA side, so it can be set while the piano is off.
+        return True
+
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         last = await self.async_get_last_state()
