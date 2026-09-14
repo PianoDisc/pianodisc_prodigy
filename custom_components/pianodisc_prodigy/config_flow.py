@@ -45,7 +45,7 @@ from .const import (
     MANUFACTURER,
     MODEL,
     MAX_MSC_CHANNELS,
-    MQTT_PAYLOAD_ONLINE,
+    MQTT_PAYLOAD_OFFLINE,
     MQTT_TOPIC_ROOT,
 )
 from .transports.http import HttpTransport
@@ -119,7 +119,10 @@ class PianoDiscConfigFlow(ConfigFlow, domain=DOMAIN):
         parts = discovery_info.topic.split("/")
         if len(parts) < 3 or parts[0] != MQTT_TOPIC_ROOT:
             return self.async_abort(reason="invalid_discovery_info")
-        if str(discovery_info.payload).strip().upper() != MQTT_PAYLOAD_ONLINE:
+        # The payload is the piano's readiness word (WARMING_UP, READY, NO_SD, FAULT)
+        # or the OFFLINE last-will. Any readiness word means the piano is on the broker.
+        payload = str(discovery_info.payload).strip().upper()
+        if not payload or payload == MQTT_PAYLOAD_OFFLINE:
             return self.async_abort(reason="device_offline")
         device_id = parts[1]
         await self.async_set_unique_id(device_id)
