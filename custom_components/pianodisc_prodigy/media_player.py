@@ -16,7 +16,7 @@ from homeassistant.components.media_player import (
     SearchMedia,
     SearchMediaQuery,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform
@@ -24,7 +24,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 import voluptuous as vol
 
-from .const import CONF_DEVICE_ID, DOMAIN, VOLUME_MAX
+from .const import CONF_DEVICE_ID, DOMAIN, LOGGER, VOLUME_MAX
 from .coordinator import PianoDiscConfigEntry, PianoDiscCoordinator
 from .entity import PianoDiscEntity
 from .transports.http import title_from_path
@@ -118,6 +118,9 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
             coordinator.config_entry.unique_id
             or coordinator.config_entry.data[CONF_DEVICE_ID]
         )
+        # play_song with restore_volume_after: (volume to put back, volume we set).
+        self._volume_restore: tuple[int, int] | None = None
+        self._volume_restore_seen_playing = False
 
     @property
     def supported_features(self) -> MediaPlayerEntityFeature:
@@ -571,15 +574,17 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         Delivers the one-call "power on → set volume → play by name → restore" ritual
         without HA scripting. When a power outlet is linked and the piano is off, it is
         powered on first. ``restore_volume_after`` snapshots the current volume and
-        re-applies it (the device has no announce/overlay concept, so we do it here).
+        puts it back once the song has finished (the device has no announce/overlay
+        concept, so we do it here; see ``_check_volume_restore``).
         """
         self._ensure_library_ready()
         await self._ensure_powered()
         transport = self.coordinator.transport
         prior = self.coordinator.data.volume
         if volume is not None:
+            volume = max(0, min(VOLUME_MAX, volume))
             await self.coordinator.async_execute_device_command(
-                transport.async_set_volume(max(0, min(VOLUME_MAX, volume)))
+                transport.async_set_volume(volume)
             )
 
         paths = await transport.async_fetch_song_paths()
@@ -601,11 +606,46 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
             )
         )
 
-        if restore_volume_after and prior is not None:
-            await self.coordinator.async_execute_device_command(
-                transport.async_set_volume(prior)
-            )
+        if restore_volume_after and volume is not None and prior is not None:
+            # A second play_song while a restore is pending keeps the original level.
+            restore_to = self._volume_restore[0] if self._volume_restore else prior
+            self._volume_restore = (restore_to, volume)
+            self._volume_restore_seen_playing = False
         await self.coordinator.async_request_refresh()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        self._check_volume_restore()
+        super()._handle_coordinator_update()
+
+    @callback
+    def _check_volume_restore(self) -> None:
+        """Put the volume back once a play_song with restore_volume_after has ended."""
+        pending = self._volume_restore
+        if pending is None:
+            return
+        data = self.coordinator.data
+        if data.state is MediaPlayerState.PLAYING:
+            self._volume_restore_seen_playing = True
+            return
+        if data.state is MediaPlayerState.PAUSED or not self._volume_restore_seen_playing:
+            return  # paused, or the song has not started yet
+        restore_to, requested = pending
+        self._volume_restore = None
+        if not data.available:
+            return  # powered off or gone: nothing to restore on
+        if data.volume is not None and data.volume != requested:
+            return  # someone changed the volume during the song; leave it alone
+
+        async def _restore() -> None:
+            try:
+                await self.coordinator.async_execute_device_command(
+                    self.coordinator.transport.async_set_volume(restore_to)
+                )
+            except Exception as err:  # best effort; the song is already over
+                LOGGER.debug("Volume restore to %s failed: %s", restore_to, err)
+
+        self.hass.async_create_task(_restore())
 
     # -- helpers -----------------------------------------------------------
     def _single_song_playback_requested(self) -> bool:
