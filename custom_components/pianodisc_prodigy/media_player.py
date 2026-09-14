@@ -320,7 +320,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         await self._command(self.coordinator.transport.async_pause())
 
     async def async_media_stop(self) -> None:
-        await self._command(self.coordinator.transport.async_stop())
+        await self._command(self.coordinator.async_stop_playback())
 
     async def async_media_next_track(self) -> None:
         await self._command(self.coordinator.transport.async_next())
@@ -662,6 +662,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
             await self.coordinator.async_power_on()
         if not self.coordinator.playback_ready:
             await self.coordinator.async_wait_until_playback_ready(POWER_ON_TIMEOUT)
+        self.coordinator.clear_pending_stop()
 
     async def _command(self, coro) -> None:
         self._ensure_library_ready()

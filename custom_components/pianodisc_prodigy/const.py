@@ -131,6 +131,9 @@ READY_WATCHDOG: Final = timedelta(seconds=75)
 # Power-link (optional dedicated outlet). The outlet itself is always independent of
 # piano connectivity. This deadline only bounds the media card's "Getting ready" state.
 POWER_ON_TIMEOUT: Final = 90
+# A Stop pressed while the piano is warming up is held until it reports READY (the
+# ESP32 drops player commands before then) — but not forever.
+STOP_PENDING_TTL: Final = 300  # seconds
 POWER_OFF_SETTLE: Final = 1.0  # seconds between the graceful Stop and cutting power
 
 # Autoplay publishes per-note .../busy bursts. Hold PLAYING this long after the last

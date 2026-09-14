@@ -41,6 +41,7 @@ from .const import (
     LOGGER,
     POWER_OFF_SETTLE,
     POWER_ON_TIMEOUT,
+    STOP_PENDING_TTL,
     MSC_RESET_CONFIRM,
     SCAN_INTERVAL_DISCONNECTED,
     SCAN_INTERVAL_IDLE,
@@ -125,6 +126,8 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         self.library_ready: bool = False
         self._notify_library_refresh = False
         self._library_lock = asyncio.Lock()
+        # Loop time until which a Stop pressed during warm-up should be delivered.
+        self._stop_pending_until: float = 0.0
         self.playlist_definitions: list[dict[str, object]] | None = None
         self.playlist_loading: bool = False
         self.playlist_error: str | None = None
@@ -220,6 +223,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         # library/playlist/AutoPlay prefetch.
         if self.data is not None and became_ready:
             self._schedule_library_prefetch()
+        self._flush_pending_stop(data)
         return data
 
     @callback
@@ -241,6 +245,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         self._update_device_registry(data)
         if became_ready:
             self._schedule_library_prefetch()
+        self._flush_pending_stop(data)
 
     @callback
     def handle_msc(self, command: str, cue: str) -> None:
@@ -619,6 +624,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
             self.hass.async_create_task(self.async_refresh())
         else:
             self._powering_on_until = 0.0
+            self._stop_pending_until = 0.0
             self._reset_msc_now()
             self.async_update_listeners()
 
@@ -646,6 +652,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
             self.hass.async_create_task(self.async_refresh())
         else:
             self._powering_on_until = 0.0
+            self._stop_pending_until = 0.0
             self._reset_msc_now()
             self.async_update_listeners()
 
@@ -668,16 +675,57 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         """Turn on the linked outlet; piano reconnection continues in background."""
         await self.async_set_outlet_power(True)
 
-    @property
-    def playback_ready(self) -> bool:
-        """Whether a playback command sent now would be acted on."""
-        data = self.data
+    def _playback_ready_for(self, data: ProdigyData | None) -> bool:
         return (
             data is not None
             and data.available
             and data.readiness in {"READY", "OK"}
             and not self.library_initializing
         )
+
+    async def async_stop_playback(self) -> None:
+        """Stop now, or hold the Stop until the piano can act on it.
+
+        AutoPlay starts as soon as the SD library loads, well before the piano
+        reports READY, and the ESP32 discards player commands until then. A Stop
+        pressed during that window is remembered and sent the moment READY arrives.
+        """
+        if self.playback_ready:
+            self._stop_pending_until = 0.0
+            await self.transport.async_stop()
+            return
+        self._stop_pending_until = self.hass.loop.time() + STOP_PENDING_TTL
+        LOGGER.debug("Piano not ready; holding Stop until it is")
+
+    @callback
+    def clear_pending_stop(self) -> None:
+        """A new play request supersedes a Stop that was waiting for readiness."""
+        self._stop_pending_until = 0.0
+
+    @callback
+    def _flush_pending_stop(self, data: ProdigyData) -> None:
+        if self._stop_pending_until == 0.0:
+            return
+        if self.hass.loop.time() >= self._stop_pending_until:
+            self._stop_pending_until = 0.0
+            LOGGER.debug("Held Stop expired before the piano became ready")
+            return
+        if not self._playback_ready_for(data):
+            return
+        self._stop_pending_until = 0.0
+
+        async def _stop() -> None:
+            try:
+                await self.transport.async_stop()
+            except Exception as err:
+                LOGGER.warning("Held Stop could not be delivered: %s", err)
+
+        self.hass.async_create_task(_stop())
+
+    @property
+    def playback_ready(self) -> bool:
+        """Whether a playback command sent now would be acted on."""
+        return self._playback_ready_for(self.data)
 
     async def async_wait_until_playback_ready(self, timeout: float) -> None:
         """Block until the piano reports ready, or raise after ``timeout`` seconds.

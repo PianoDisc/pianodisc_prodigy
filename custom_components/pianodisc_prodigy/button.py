@@ -31,7 +31,11 @@ async def async_setup_entry(
 
 
 class PianoDiscStopPlaybackButton(PianoDiscEntity, ButtonEntity):
-    """Stops SD-card MIDI playback through a normal dashboard button entity."""
+    """Stops SD-card MIDI playback through a normal dashboard button entity.
+
+    Available while the piano warms up, when AutoPlay may already be playing: the
+    coordinator holds the Stop until the piano can act on it.
+    """
 
     _attr_translation_key = "stop_playback"
     _attr_icon = "mdi:stop"
@@ -44,8 +48,15 @@ class PianoDiscStopPlaybackButton(PianoDiscEntity, ButtonEntity):
         )
         self._attr_unique_id = f"{device_id}_stop_playback"
 
+    @property
+    def available(self) -> bool:
+        coordinator = self.coordinator
+        if coordinator.power_linked and coordinator.power_on is False:
+            return False  # nothing is playing on a piano with its power cut
+        return True
+
     async def async_press(self) -> None:
-        await self.coordinator.transport.async_stop()
+        await self.coordinator.async_stop_playback()
 
 
 class PianoDiscRebootButton(PianoDiscEntity, ButtonEntity):
