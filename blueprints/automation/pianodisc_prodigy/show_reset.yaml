@@ -1,0 +1,105 @@
+blueprint:
+  name: PianoDisc show reset
+  description: >-
+    Put your show lighting back to a known state before and after every song a PianoDisc
+    Prodigy II plays, so nothing a cue left on lingers into the next song or the rest of
+    the house. Pick an "everything off" scene (or the entities to turn off) and the piano
+    to follow. Create one automation from this blueprint per piano.
+  domain: automation
+  author: PianoDisc
+  source_url: https://github.com/PianoDisc/pianodisc_prodigy/blob/main/blueprints/automation/pianodisc_prodigy/show_reset.yaml
+  homeassistant:
+    min_version: 2026.3.0
+  input:
+    piano:
+      name: Piano
+      description: The piano's media player.
+      selector:
+        entity:
+          filter:
+            integration: pianodisc_prodigy
+            domain: media_player
+    reset_entities:
+      name: Reset
+      description: >-
+        What "everything off" means for your show: a scene that sets every fixture the way
+        it should rest, or the lights and switches to turn off. A scene is activated; the
+        rest is turned off.
+      selector:
+        entity:
+          multiple: true
+          filter:
+            domain:
+              - scene
+              - light
+              - switch
+              - fan
+              - input_boolean
+              - media_player
+              - script
+    at_start:
+      name: Reset when a song starts
+      description: >-
+        Also reset the moment a new song begins, not only when playback ends. Leave this
+        on unless a song opens with a lighting cue on its very first beat, which the reset
+        could then undo.
+      default: true
+      selector:
+        boolean:
+
+# A reset at the end of one song and at the start of the next can arrive close
+# together; run them in order rather than dropping one.
+mode: queued
+max: 5
+
+triggers:
+  # The integration publishes RESET once when a song has ended for good (or the piano
+  # went offline or was powered off), after the pause/next-track ambiguity has settled.
+  - trigger: event
+    event_type: pianodisc_prodigy_msc
+    event_data:
+      command: RESET
+    id: end
+  # A new song shows up as a new media_content_id on the player. Pause and resume keep
+  # the same id, so they never trigger this.
+  - trigger: state
+    entity_id: !input piano
+    attribute: media_content_id
+    id: start
+
+variables:
+  piano: !input piano
+  at_start: !input at_start
+  reset_entities: !input reset_entities
+  reset_scenes: "{{ reset_entities | select('match', 'scene\\.') | list }}"
+  reset_scripts: "{{ reset_entities | select('match', 'script\\.') | list }}"
+  reset_other: >-
+    {{ reset_entities | reject('match', 'scene\\.') | reject('match', 'script\\.') | list }}
+
+conditions:
+  - condition: template
+    value_template: >-
+      {% if trigger.id == 'end' %}
+        {{ ('pianodisc_prodigy', trigger.event.data.device_id)
+           in (device_attr(device_id(piano), 'identifiers') or []) }}
+      {% else %}
+        {{ true if (at_start and trigger.to_state is not none
+                    and trigger.to_state.attributes.media_content_id) else false }}
+      {% endif %}
+
+actions:
+  - if: "{{ reset_scenes | count > 0 }}"
+    then:
+      - action: scene.turn_on
+        target:
+          entity_id: "{{ reset_scenes }}"
+  - if: "{{ reset_scripts | count > 0 }}"
+    then:
+      - action: script.turn_on
+        target:
+          entity_id: "{{ reset_scripts }}"
+  - if: "{{ reset_other | count > 0 }}"
+    then:
+      - action: homeassistant.turn_off
+        target:
+          entity_id: "{{ reset_other }}"

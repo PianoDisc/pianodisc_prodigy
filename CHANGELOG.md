@@ -21,6 +21,12 @@
   (authored in the cue editor). The cue event exposes it as `fade`, and the blueprint
   ramps lights and scenes that support transitions over it: GO up, STOP down. A plain
   cue switches at once; FIRE never fades.
+- Blueprint: STOP on a channel whose On is a scene now turns off the lights and switches
+  the scene contains (with the cue's fade) when Off is empty. A scene cannot be turned
+  off, so such a channel never went dark before.
+- Adds the **PianoDisc show reset** blueprint: activate an "everything off" scene when a
+  song ends and, optionally, when the next one starts. Backed by a new `RESET` command
+  on the `pianodisc_prodigy_msc` bus event, published once per confirmed show end.
 - The **Stop** button works while the piano is starting up: a press before the piano
   reports ready is held and sent the moment it is.
 - Single Play switch is always available, so automations can set it while the piano

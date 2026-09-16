@@ -177,6 +177,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         self._msc_seq = 0
         self._msc_reset_cancel: Callable[[], None] | None = None
         self._msc_reset_seq = 0
+        self._msc_reset_announced = False
         self.transport.set_msc_listener(self.handle_msc)
 
     @property
@@ -274,6 +275,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         in the cue number; FIRE never carries one.
         """
         self._msc_seq += 1
+        self._msc_reset_announced = False
         parsed, cue_fade = parse_cue(cue)
         if fade is None:
             fade = cue_fade
@@ -301,6 +303,16 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
                 cue,
                 fade,
             )
+        self._fire_msc_event(command, cue, channel, fade, handled)
+
+    def _fire_msc_event(
+        self,
+        command: str,
+        cue: str | None,
+        channel: int | None,
+        fade: float | None,
+        handled: bool,
+    ) -> None:
         device_id = self.config_entry.unique_id or self.config_entry.data[CONF_DEVICE_ID]
         self.hass.bus.async_fire(
             EVENT_MSC,
@@ -320,13 +332,22 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
             self._msc_reset_cancel()
             self._msc_reset_cancel = None
 
-    def _reset_msc_now(self) -> None:
+    def _reset_msc_now(self, *, announce: bool = True) -> None:
+        """Clear every channel; ``announce`` also publishes a RESET on the bus.
+
+        The RESET is the show-level "song over" signal automations use to put
+        lights back to a known state (see the show reset blueprint). It fires
+        once per show end, never repeatedly while the piano stays offline.
+        """
         self._cancel_msc_reset()
         if any(self.msc_channel_states.values()):
             self.msc_channel_states.clear()
             self.async_update_listeners()
         else:
             self.msc_channel_states.clear()
+        if announce and not self._msc_reset_announced:
+            self._msc_reset_announced = True
+            self._fire_msc_event("RESET", None, None, None, True)
 
     @callback
     def _msc_reset_fired(self, _now: object) -> None:
@@ -343,10 +364,11 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         pending wipe and the delayed callback is ordered against MSC messages.
         """
         if not new.available:
-            self._reset_msc_now()
+            self._reset_msc_now(announce=prev is not None and prev.available)
             return
         if new.state is MediaPlayerState.PLAYING:
             self._cancel_msc_reset()
+            self._msc_reset_announced = False
             return
         if prev is None or self._msc_reset_cancel is not None:
             return
