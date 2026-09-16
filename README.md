@@ -237,7 +237,8 @@ Then, for each channel you use, **Settings → Automations → Create automation
 1. **Channel** — the channel's cue event, for example *Channel 1 cue*.
 2. **On** — the lights, switches, scene, or script this channel turns on.
 3. **Off** — optional; something to activate when the channel turns off, such as an
-   "off" scene. Leave it empty and the On items are simply turned off.
+   "off" scene. Leave it empty and the On items are simply turned off; for a scene in
+   On, that means the lights and switches the scene contains.
 4. **Flash length** — how long a FIRE holds the channel on, default 100 ms.
 
 GO turns On on, STOP turns it off, and FIRE flashes: on, wait, off. A flash while the
@@ -251,7 +252,7 @@ beat.
 |---|---|---|
 | A floor lamp | the lamp | *(empty)* |
 | A pump or fountain | the pump switch | *(empty)* |
-| A DMX fixture, "purple wash" | scene **Purple wash** | scene **Wash off** |
+| A DMX fixture, "purple wash" | scene **Purple wash** | *(empty)* or scene **Wash off** |
 
 For a DMX fixture, make the scene first: set the fixture's dimmer, colour, and effect
 entities exactly how you want them, then **Settings → Automations → Scenes → Add scene**
@@ -267,6 +268,19 @@ channel and the scenes. Editing the fields and saving again changes the automati
 already saved; it does not create a new one. The blueprint runs cues in parallel so a burst of FIRE cues never
 delays the GO or STOP behind it, and it ignores restarts so a reload never switches your
 lights off.
+
+**Reset between songs.** A fixture left on by a cue stays on until something turns it
+off, and with a DMX rig that can spill into the rest of the house. The second blueprint
+puts the show back to a known state when a song ends and, optionally, the moment the next
+one begins:
+
+[![Import the show reset blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FPianoDisc%2Fpianodisc_prodigy%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fpianodisc_prodigy%2Fshow_reset.yaml)
+
+Create one automation from **PianoDisc show reset** per piano: pick the piano's media
+player and an "everything off" scene (or the entities to turn off). The end-of-song reset
+waits until the integration is sure the song is over, so a pause or the gap before the
+next track never resets anything. Turn off **Reset when a song starts** if a song opens
+with a lighting cue on its very first beat.
 
 For hand-written automations and the raw bus event, see
 [Automations → MIDI Show Control cues](docs/automations.md#midi-show-control-cues).
