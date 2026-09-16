@@ -41,7 +41,8 @@ blueprint:
       name: "Off (optional)"
       description: >-
         Something to activate when the channel turns off, such as an "off" scene for a
-        DMX fixture. Leave empty to simply turn the On items off.
+        DMX fixture. Leave empty to simply turn the On items off; for a scene in On,
+        that means turning off the lights and switches the scene contains.
       default: []
       selector:
         entity:
@@ -102,9 +103,25 @@ variables:
   off_lights: "{{ off_entities | select('match', 'light\\.') | list }}"
   off_scenes: "{{ off_entities | select('match', 'scene\\.') | list }}"
   off_other: "{{ off_entities | reject('match', 'light\\.') | reject('match', 'scene\\.') | list }}"
-  # A scene cannot be turned off; STOP simply activates the Off items (if any) and
-  # turns off whatever in On is not a scene.
-  turn_off_entities: "{{ on_entities | reject('match', 'scene\\.') | list }}"
+  # A scene cannot be turned off. With nothing in Off, STOP turns off the lights
+  # and switches the On scenes contain (the scene entity lists its members), so a
+  # DMX look set by a scene goes dark again without an "off" scene. With an Off
+  # item given, that item is what puts the fixture away.
+  scene_members: >-
+    {% set ns = namespace(items=[]) %}
+    {% for scene in on_scenes %}
+      {% set ns.items = ns.items + (state_attr(scene, 'entity_id') or []) %}
+    {% endfor %}
+    {{ ns.items | unique | list }}
+  member_lights: >-
+    {{ scene_members | select('match', 'light\\.') | list
+       if off_entities | count == 0 else [] }}
+  member_other: >-
+    {{ scene_members | select('match', '(switch|fan|input_boolean|media_player)\\.') | list
+       if off_entities | count == 0 else [] }}
+  stop_lights: "{{ (on_lights + member_lights) | unique | list }}"
+  stop_other: "{{ (on_other + member_other) | unique | list }}"
+  turn_off_entities: "{{ stop_lights + stop_other }}"
   command: "{{ trigger.to_state.attributes.event_type }}"
   cue: "{{ trigger.to_state.attributes.cue | default('') }}"
 
@@ -152,18 +169,18 @@ actions:
               - action: homeassistant.turn_on
                 target:
                   entity_id: "{{ off_other }}"
-          - if: "{{ on_lights | count > 0 }}"
+          - if: "{{ stop_lights | count > 0 }}"
             then:
               - action: light.turn_off
                 target:
-                  entity_id: "{{ on_lights }}"
+                  entity_id: "{{ stop_lights }}"
                 data:
                   transition: "{{ fade }}"
-          - if: "{{ on_other | count > 0 }}"
+          - if: "{{ stop_other | count > 0 }}"
             then:
               - action: homeassistant.turn_off
                 target:
-                  entity_id: "{{ on_other }}"
+                  entity_id: "{{ stop_other }}"
       - conditions: "{{ command == 'fire' }}"
         sequence:
           - if: "{{ on_entities | count > 0 }}"
