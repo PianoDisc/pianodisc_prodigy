@@ -254,6 +254,13 @@ beat.
 | A pump or fountain | the pump switch | *(empty)* |
 | A DMX fixture, "purple wash" | scene **Purple wash** | *(empty)* or scene **Wash off** |
 
+**Looks that share a fixture.** A "white wash" and a "pink wash" scene usually drive the
+same dimmer. The newest look owns the fixture: a STOP only releases what no scene
+activated since has claimed. So to change looks without a blink, author the new look's
+GO and then the old look's STOP, on the same beat or later; the wash simply becomes pink.
+Give the GO a fade and the change dissolves. The old look's STOP still turns off
+anything only it used.
+
 For a DMX fixture, make the scene first: set the fixture's dimmer, colour, and effect
 entities exactly how you want them, then **Settings → Automations → Scenes → Add scene**
 and capture them. A scene is Home Assistant's way of saying "this exact look across
