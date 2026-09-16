@@ -107,10 +107,28 @@ variables:
   # and switches the On scenes contain (the scene entity lists its members), so a
   # DMX look set by a scene goes dark again without an "off" scene. With an Off
   # item given, that item is what puts the fixture away.
+  #
+  # Looks often share a fixture (a "white wash" and a "pink wash" scene both drive
+  # the same dimmer). The newest look owns the fixture: a member is released only
+  # if no other scene containing it has been activated since this channel's scene
+  # was. So "GO pink, STOP white" leaves the wash pink, and the STOP of the look
+  # that still owns the fixture turns it off. A scene's state is the time it was
+  # last activated, which is what makes this possible without any extra input.
   scene_members: >-
     {% set ns = namespace(items=[]) %}
     {% for scene in on_scenes %}
-      {% set ns.items = ns.items + (state_attr(scene, 'entity_id') or []) %}
+      {% set mine = states(scene) %}
+      {% for member in state_attr(scene, 'entity_id') or [] %}
+        {% set ns.taken = false %}
+        {% for other in states.scene
+             if other.entity_id not in on_scenes
+             and other.state not in ['unknown', 'unavailable']
+             and member in (other.attributes.entity_id or [])
+             and other.state > mine %}
+          {% set ns.taken = true %}
+        {% endfor %}
+        {% if not ns.taken %}{% set ns.items = ns.items + [member] %}{% endif %}
+      {% endfor %}
     {% endfor %}
     {{ ns.items | unique | list }}
   member_lights: >-

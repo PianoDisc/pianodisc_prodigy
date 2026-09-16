@@ -23,7 +23,9 @@
   cue switches at once; FIRE never fades.
 - Blueprint: STOP on a channel whose On is a scene now turns off the lights and switches
   the scene contains (with the cue's fade) when Off is empty. A scene cannot be turned
-  off, so such a channel never went dark before.
+  off, so such a channel never went dark before. Looks that share a fixture follow
+  "newest look owns it": a STOP leaves alone anything a scene activated since has
+  claimed, so "GO pink, STOP white" ends pink instead of dark.
 - Adds the **PianoDisc show reset** blueprint: activate an "everything off" scene when a
   song ends and, optionally, when the next one starts. Backed by a new `RESET` command
   on the `pianodisc_prodigy_msc` bus event, published once per confirmed show end.
