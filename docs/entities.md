@@ -206,13 +206,14 @@ Restarts the piano. Playback stops.
 The Prodigy II runs two separate firmwares that are versioned independently. Each entity
 shows the installed version and whether a newer one is available.
 
-These are **read-only indicators**. Installing firmware is done with the PianoDisc
-Calibrate App, not from Home Assistant. Calibrate is a technician and installer tool —
-if an update is available, your installer or dealer is the right person to ask.
+These are **read-only indicators**. Firmware is installed on the piano itself, not from
+Home Assistant — see
+[Update the piano's firmware](../README.md#update-the-pianos-firmware).
 
-The Prodigy II runs its two engines as a matched pair, so both are normally updated
-together. After an update you can confirm the versions on the piano's LCD screen under
-**Info → Version**.
+The Prodigy II runs its two engines as a matched pair, so both are updated together,
+audio engine first. After an update, confirm the versions on the piano's LCD screen
+under **Info → Version**, or press **Refresh device info** to have Home Assistant re-read
+them.
 
 Both stay available when the piano is offline, since they report the last known versions
 rather than live state.

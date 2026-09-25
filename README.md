@@ -1,22 +1,21 @@
 # PianoDisc Prodigy II for Home Assistant
 
-![Status: Alpha — not for public use](https://img.shields.io/badge/status-ALPHA%20%E2%80%94%20not%20for%20public%20use-critical?style=for-the-badge)
+![Status: Beta](https://img.shields.io/badge/status-BETA-orange?style=for-the-badge)
 
-## ⚠️ Alpha — not ready for use
+## Beta
 
-> **This integration is in alpha. Please don't install it yet.**
+> **This integration is in beta.** It's ready to try, and it's still changing.
 >
-> - **It needs firmware we haven't released.** The Prodigy II firmware this integration
->   depends on is still in beta testing and isn't publicly available, so it will not work
->   on a current production piano.
-> - **Breaking changes are frequent.** Entities, their names and their behaviour are all
->   still moving. An update can and will break automations you've built on it.
-> - **It is not supported yet.** Please don't file issues or contact PianoDisc support
->   about it at this stage.
->
-> **Wait for the beta.** Watch this repository to be notified when it's ready to try. The
-> documentation below describes where the integration is heading and is published so it
-> can be reviewed — not as an invitation to install.
+> - **It needs beta firmware.** The Prodigy II firmware this integration depends on is in
+>   beta testing. To test it, email [tech@pianodisc.com](mailto:tech@pianodisc.com) and
+>   ask to be added to the beta list, then follow
+>   [Update the piano's firmware](#update-the-pianos-firmware).
+> - **Expect some changes before 1.0.** Entity names and behaviour can still change
+>   between releases, so an update may occasionally mean adjusting an automation. The
+>   [changelog](CHANGELOG.md) lists what changed in each release.
+> - **Report problems here.** For anything wrong with the integration, open a
+>   [GitHub issue](https://github.com/PianoDisc/pianodisc_prodigy/issues) (see
+>   [Getting help](#getting-help)).
 
 ---
 
@@ -39,11 +38,84 @@ You need:
   [official HACS download guide](https://www.hacs.xyz/docs/use/download/download/)
 - Your **Prodigy II powered on** and connected to the same network as Home Assistant
 - PianoDisc **audio engine firmware 0.5.0** (or newer) and **MIDI engine firmware 1.4.0**
-  (or newer). These are currently in beta testing and not yet officially released —
-  contact [PianoDisc support](https://pianodisc.com/support/) about availability.
+  (or newer). These are beta releases — see
+  [Update the piano's firmware](#update-the-pianos-firmware) for how to get and install
+  them.
 
 That's all. **MQTT is optional** — the integration works without it, and you can
 [add it later](docs/mqtt.md) for instant updates and the keys-active sensor.
+
+## Update the piano's firmware
+
+The Prodigy II has two processors, the **audio engine** and the **MIDI engine**, and each
+has its own firmware. Update both, **audio engine first**.
+
+**Getting the firmware.** The firmware this integration needs is in beta testing and isn't
+published here. If you'd like to test it, email
+[tech@pianodisc.com](mailto:tech@pianodisc.com) and ask to be added to the beta list.
+You'll receive two files:
+
+| File | Engine | How it's installed |
+|---|---|---|
+| `sd5-audio-MMDDYY-VVV.bin` | Audio engine | Uploaded from a web browser |
+| `sd5-midi-MMDDYY-VVV.zip` | MIDI engine | Unzipped onto a microSD card |
+
+The two files are different; don't swap them.
+
+**Before you start:**
+
+- Note the piano's IP address (see
+  [Finding your piano's IP address](#finding-your-pianos-ip-address)).
+- Keep the piano powered for the whole update. If you've linked a power outlet or have
+  automations that turn the piano off or reboot it, pause them until you're done.
+- Between the two updates, the piano's screen may show **Version Mismatch** or stay on
+  **Initializing**, and Home Assistant may show the piano as unavailable or warming up.
+  That's expected — carry on with the second update.
+
+### 1. Audio engine: upload it from a web browser
+
+You need a computer on the same network as the piano.
+
+1. Open a web browser (Chrome or Edge work best) and go to `http://` followed by the
+   piano's IP address, for example `http://192.168.1.50`. A "Not secure" warning is normal
+   for a device on your own network.
+2. In the blue toolbar at the top of the page, select **Updates**.
+3. Under **Local Firmware Upload**, click **Choose File** and pick the `sd5-audio-….bin`
+   file.
+4. Click **Upload!**. An **Upgrade Progress** window shows how it's going. Don't refresh
+   the page or turn the piano off while it runs.
+5. When it says **Success!**, click **Close**, then press the piano's **Reset** button or
+   turn it off and on.
+6. Reload the page. The button at the bottom should read **Reboot**. If it reads
+   **Exit Recovery**, click it to start the piano normally.
+
+If the progress stops changing for several minutes, wait three minutes, turn the piano
+off and on, and try again. If the upload keeps failing, press **Recovery** on that page
+first and wait until **Exit Recovery** shows at the bottom, then upload. The piano can
+get a different IP address in recovery mode; check **Info → IP Address** on its screen.
+
+### 2. MIDI engine: copy it to a microSD card
+
+You need a computer that can write to a microSD card.
+
+1. Unzip the `sd5-midi-….zip` file. It contains one file, `sd5-midi-update.bin`. Your
+   computer may say it doesn't recognise the file type; that's fine.
+2. Copy `sd5-midi-update.bin` to the top level of a FAT32-formatted microSD card — not
+   into a folder — and don't rename it. The card that holds your songs works.
+3. Eject the card safely and put it in the piano's SD card slot.
+4. The piano's screen shows **Reading SD Card, Please Wait**, then **Update Available,
+   Press Reset**. Press **Reset**, or turn the piano off and on.
+5. The screen shows **Upgrading** with a percentage. Don't turn the piano off. When it's
+   done, the piano restarts by itself.
+
+### 3. Check the versions
+
+- On the piano's screen, go to **Info → Version**. Both engines should show the new
+  versions, with no **Version Mismatch** warning.
+- In Home Assistant, the **Audio firmware** and **MIDI firmware** entities show the
+  installed versions. If they still show the old ones, press **Refresh device info**.
+- If you used the card that holds your songs, you can delete `sd5-midi-update.bin` from it
+  now.
 
 ## Install
 
@@ -306,8 +378,8 @@ how well they play and how they appear in Home Assistant.
 - **"Busy" needs MQTT.** Without a broker the sensor stays unknown, because the
   piano reports it over MQTT only.
 - **Firmware entities are read-only.** They tell you when a newer firmware is available;
-  installing it is done with the PianoDisc Calibrate App, which your installer or dealer
-  normally handles.
+  you install it on the piano itself — see
+  [Update the piano's firmware](#update-the-pianos-firmware).
 - **Voice control is better at starting than stopping.** A playing piano is loud and sits
   in the same room as your microphone, so *"stop the piano"* is often misheard. Always
   keep another way to stop it within reach — see

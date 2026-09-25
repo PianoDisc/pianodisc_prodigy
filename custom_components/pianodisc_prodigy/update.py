@@ -5,8 +5,9 @@ update is available. Installed comes from the device (…/version
 over MQTT, or /debugJson over HTTP); the recommended ("latest") version is a
 maintained constant for now.
 
-Read-only on purpose: firmware is installed with the PianoDisc Calibrate App, so no
-INSTALL feature is advertised — this entity is the "update available" indicator only.
+Read-only on purpose: firmware is installed on the piano itself (a web upload for the
+audio engine, an SD card for the MIDI engine; see the README), so no INSTALL feature is
+advertised — this entity is the "update available" indicator only.
 """
 
 from __future__ import annotations

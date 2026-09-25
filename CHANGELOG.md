@@ -1,7 +1,10 @@
 # Changelog
 
-## Unreleased (0.1.6)
+## v0.2.0 - 2026-09-25
 
+- **Beta.** The integration moves from alpha to beta. The README explains how to update
+  the piano's firmware and how to join the firmware beta.
+- The **MIDI firmware** entity recommends MIDI engine 1.4.5 (audio engine 0.5.1).
 - Adds the **PianoDisc MSC cue** blueprint with an import button: one automation per
   show-control channel, with On, Off, and flash-length inputs.
 - Show control: one cue event per channel carrying GO, STOP, and FIRE, plus a channel
