@@ -153,10 +153,10 @@
   },
   "exceptions": {
     "song_not_found": {
-      "message": "No song matching '{song}' was found on the piano."
+      "message": "No song matching {song} was found on the piano."
     },
     "playlist_not_found": {
-      "message": "No playlist matching '{playlist}' was found on the piano."
+      "message": "No playlist matching {playlist} was found on the piano."
     },
     "debug_info_target": {
       "message": "Choose exactly one PianoDisc media player."
