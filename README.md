@@ -129,9 +129,10 @@ automation can set it before it starts a song. While a song is playing, flipping
 changes what happens when that song ends. Changing repeat to `all` or `one` during a
 song also turns it off for that song.
 
-Home Assistant's compact media controls may show Play/Pause without a visible Stop
-button. Add the **Stop** button entity next to the media player if you want
-Stop available directly on the dashboard.
+Home Assistant's media controls never show a Stop button for the piano: a player that can
+pause gets Pause in that spot, in the media player dialog and on every media card. The
+player still stops from automations and scripts (`media_player.media_stop`). To stop from
+a dashboard, add the **Stop** button entity next to the media player.
 
 For playlist editing, add the built-in **PianoDisc Playlists** custom card to any dashboard.
 When you have more than one piano, set `entity` to the media player for the piano this card

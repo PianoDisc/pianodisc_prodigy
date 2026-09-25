@@ -190,8 +190,10 @@ SSID, and Bluetooth name. These are otherwise read once when the piano comes onl
 
 ## Stop (button)
 
-Stops the current SD-card MIDI playback. Use it on dashboards where Home Assistant's
-compact media controls show Play/Pause but hide the media player's built-in Stop command.
+Stops the current SD-card MIDI playback. Home Assistant's media controls never show Stop
+for a player that can pause (the dialog and media cards show Pause instead), so this
+button is the way to stop from a dashboard. Automations and scripts can use either this
+button or `media_player.media_stop`.
 
 ## Reboot (button)
 
