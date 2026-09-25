@@ -29,6 +29,8 @@
 - Adds the **PianoDisc show reset** blueprint: activate an "everything off" scene when a
   song ends and, optionally, when the next one starts. Backed by a new `RESET` command
   on the `pianodisc_prodigy_msc` bus event, published once per confirmed show end.
+  A Stop sent from Home Assistant (Stop button or media-player Stop) resets at once
+  instead of waiting out the confirm window; pause still never resets.
 - The **Stop** button works while the piano is starting up: a press before the piano
   reports ready is held and sent the moment it is.
 - Single Play switch is always available, so automations can set it while the piano

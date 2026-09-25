@@ -740,10 +740,14 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         AutoPlay starts as soon as the SD library loads, well before the piano
         reports READY, and the ESP32 discards player commands until then. A Stop
         pressed during that window is remembered and sent the moment READY arrives.
+
+        A delivered Stop ends the show at once: the channels clear and RESET fires
+        without the confirm window a stop seen only in the piano's status needs.
         """
         if self.playback_ready:
             self._stop_pending_until = 0.0
             await self.transport.async_stop()
+            self._reset_msc_now()
             return
         self._stop_pending_until = self.hass.loop.time() + STOP_PENDING_TTL
         LOGGER.debug("Piano not ready; holding Stop until it is")
@@ -770,6 +774,8 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
                 await self.transport.async_stop()
             except Exception as err:
                 LOGGER.warning("Held Stop could not be delivered: %s", err)
+                return
+            self._reset_msc_now()
 
         self.hass.async_create_task(_stop())
 

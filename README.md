@@ -286,8 +286,9 @@ one begins:
 Create one automation from **PianoDisc show reset** per piano: pick the piano's media
 player and an "everything off" scene (or the entities to turn off). The end-of-song reset
 waits until the integration is sure the song is over, so a pause or the gap before the
-next track never resets anything. Turn off **Reset when a song starts** if a song opens
-with a lighting cue on its very first beat.
+next track never resets anything, while pressing Stop in Home Assistant resets at once.
+Turn off **Reset when a song starts** if a song opens with a lighting cue on its very
+first beat.
 
 For hand-written automations and the raw bus event, see
 [Automations → MIDI Show Control cues](docs/automations.md#midi-show-control-cues).

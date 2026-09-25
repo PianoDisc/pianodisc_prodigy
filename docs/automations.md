@@ -198,8 +198,9 @@ model ID on the device page), not Home Assistant's device registry ID.
 The same event carries `command: RESET` once a song has ended for good, or the piano went
 offline or was powered off: `cue`, `channel` and `fade` are `null`. It fires after the
 integration has confirmed the end (a pause or the gap before the next track never
-produces one), which makes it the signal for an "everything off" automation; the
-**PianoDisc show reset** blueprint in the README is built on it.
+produces one), or as soon as a Stop from Home Assistant reaches the piano. That makes it
+the signal for an "everything off" automation; the **PianoDisc show reset** blueprint in
+the README is built on it.
 
 ## Wait until the piano is ready before playing
 

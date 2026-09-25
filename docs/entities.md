@@ -131,8 +131,9 @@ actually sent.
 
 Choose the number of channels in the integration's **Options** (`msc_channels`, default
 8; 0 removes these entities). Channel states turn off a few seconds after a song ends or
-the piano goes offline; pausing does not reset them. They are not restored after a Home
-Assistant restart. Without MQTT, channel binary sensors show unknown.
+the piano goes offline, and at once when Stop is pressed in Home Assistant; pausing does
+not reset them. They are not restored after a Home Assistant restart. Without MQTT,
+channel binary sensors show unknown.
 
 To tie a channel to a light, scene, or script, import the
 [show control blueprint](../README.md#show-control-lights-and-effects-that-follow-the-music).
