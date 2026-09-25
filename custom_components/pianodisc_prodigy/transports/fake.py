@@ -4,7 +4,7 @@ Used by the scaffold (so adding the config entry yields a working "piano" you ca
 play with in the HA UI) and by the test suite (a real coordinator + real entities
 driven against a deterministic transport). It models the observable contract only:
 transport state, volume echo, shuffle, song list, and a simulated ``busy`` pulse on
-track load. It does NOT simulate UART/MQTT timing quirks — those belong in the real
+track load. It does NOT simulate device/MQTT timing quirks — those belong in the real
 transports' own tests.
 """
 

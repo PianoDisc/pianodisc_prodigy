@@ -93,7 +93,7 @@ def _format_device_sw_version(data: ProdigyData) -> str | None:
 
 
 def _normalize_autoplay_config(config: dict[str, object]) -> dict[str, object]:
-    """Normalize the four settings persisted by the nRF AutoPlay implementation."""
+    """Normalize the four AutoPlay settings persisted by the piano."""
     playlist = config.get("playlist")
     sort = config.get("sort")
     return {
@@ -111,8 +111,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
     path (``_async_update_data``) is the fallback and the snapshot-on-startup seed.
 
     Optionally tracks a user-linked power outlet (``CONF_POWER_SWITCH``): its on/off
-    state becomes the piano's power authority, and TURN_ON/TURN_OFF drive it. See
-     (revised 2026-06-08: linking grants full on/off control).
+    state becomes the piano's power authority, and TURN_ON/TURN_OFF drive it.
     """
 
     config_entry: PianoDiscConfigEntry
@@ -162,8 +161,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         self.power_on: bool | None = None
         # Loop-time deadline: while "now" is before it AND the piano isn't reachable
         # yet, the media_player shows a transient "starting" state. Time-bounded so it
-        # can never wedge, and overridden the moment the piano reports. See
-        # .
+        # can never wedge, and overridden the moment the piano reports.
         self._powering_on_until = 0.0
         # Single Play: a direct song pick plays that song only and stops. Kept on
         # the HA side because the device treats the flag as part of each play
@@ -191,7 +189,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
 
         Accurate because the linked switch tells us it *is* on, so this is "getting
         ready", not unknown/idle. Cleared the moment a real state arrives; time-bounded
-        so a non-responding piano can't wedge it. See .
+        so a non-responding piano can't wedge it.
         """
         if not (self.power_linked and self.power_on):
             return False
@@ -604,7 +602,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
 
     @property
     def library_status(self) -> str:
-        """User-facing phase, separate from the NRF's hardware readiness."""
+        """User-facing phase, separate from the piano's own readiness."""
         if self.data.readiness not in {"READY", "OK"}:
             return "Waiting for piano"
         if self.library_scanning:
@@ -738,7 +736,7 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         """Stop now, or hold the Stop until the piano can act on it.
 
         AutoPlay starts as soon as the SD library loads, well before the piano
-        reports READY, and the ESP32 discards player commands until then. A Stop
+        reports READY, and the piano discards player commands until then. A Stop
         pressed during that window is remembered and sent the moment READY arrives.
 
         A delivered Stop ends the show at once: the channels clear and RESET fires
@@ -788,8 +786,8 @@ class PianoDiscCoordinator(DataUpdateCoordinator[ProdigyData]):
         """Block until the piano reports ready, or raise after ``timeout`` seconds.
 
         Used by play commands issued while the piano is off or still booting: the
-        outlet returns immediately, and a command sent before the MIDI engine is
-        ready is simply dropped by the firmware.
+        outlet returns immediately, and a command sent before the piano is ready is
+        simply dropped by the firmware.
         """
         if self.playback_ready:
             return

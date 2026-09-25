@@ -28,10 +28,6 @@ class PianoDiscEntity(CoordinatorEntity[PianoDiscCoordinator]):
             connections = {(CONNECTION_NETWORK_MAC, network_mac)}
 
         # Device name = firmware device_name (display only; never an identity key).
-        # TODO(naming): once the device-merge is confirmed, decide
-        # whether to disambiguate the piano media_player from the streaming player
-        # ( "<name> Piano" — likely _attr_name="Piano" on the media
-        # player). Deferred with the merge since it's unverified and cosmetic.
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, device_id)},
             connections=connections,

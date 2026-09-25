@@ -35,9 +35,9 @@ PARALLEL_UPDATES = 1
 
 # Features actually backed by a device control. REPEAT_SET is added dynamically for
 # the All Songs session; playlist and AutoPlay keep their own repeat policies.
-# per-entity only when the user links a power outlet (see ).
+# TURN_ON/TURN_OFF are added per-entity only when the user links a power outlet.
 # SELECT_SOURCE is intentionally omitted: playlists are browsed, not coerced into a
-# "source" ().
+# "source".
 # TURN_ON/OFF are added only when a power outlet is linked.
 _SUPPORTED = (
     MediaPlayerEntityFeature.PLAY
@@ -65,7 +65,7 @@ ATTR_SONG = "song"
 
 # Shown as the now-playing text while firmware prepares MIDI and SD playback.
 _STARTING_TITLE = "Preparing piano…"
-# Shown after the NRF is ready while HA exclusively scans the shared SD library.
+# Shown after the piano is ready while HA exclusively scans the shared SD library.
 _LIBRARY_SYNCING_TITLE = "Syncing library…"
 # Shown while playing but the new song's name isn't known yet (instead of the old one).
 _SONG_LOADING = "Loading…"
@@ -138,7 +138,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
             and self.coordinator.data.queue_mode == "all_songs"
         ):
             features |= MediaPlayerEntityFeature.REPEAT_SET
-        # TURN_ON/TURN_OFF only when a power outlet is linked ().
+        # TURN_ON/TURN_OFF only when a power outlet is linked.
         if self.coordinator.power_linked:
             features |= (
                 MediaPlayerEntityFeature.TURN_ON | MediaPlayerEntityFeature.TURN_OFF
@@ -158,7 +158,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
             return MediaPlayerState.ON
         # Linked + powered on but not reporting yet → "getting ready" (booting). We know
         # it's on (the switch), so present as ON with a "Getting ready…" title rather
-        # than a false Idle/Playing. See .
+        # than a false Idle/Playing.
         if coordinator.getting_ready:
             return MediaPlayerState.ON
         if coordinator.library_initializing:
@@ -170,7 +170,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         coordinator = self.coordinator
         # With a linked outlet the switch is the power authority: stay available while
         # powered off so the card shows OFF with a working power button rather than
-        # greying out (which would hide turn-on). See .
+        # greying out (which would hide turn-on).
         if coordinator.power_linked and coordinator.power_on is False:
             return True
         # Show a live preparation state rather than a grey, unexplained failure.
@@ -178,7 +178,7 @@ class PianoDiscMediaPlayer(PianoDiscEntity, MediaPlayerEntity):
         if coordinator.hardware_warming:
             return True
         # A device-reported non-ready state is authoritative. Keep the player
-        # unavailable while the NRF is still preparing MIDI and playback logic.
+        # unavailable while the piano is still preparing MIDI and playback.
         if coordinator.data.readiness not in {"unknown", "READY", "OK"}:
             return False
         # Stay available (showing "getting ready") through the power-on/boot window.

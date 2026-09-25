@@ -55,7 +55,7 @@ class ProdigyData:
     bluetooth_name: str | None = None
     firmware_audio: str | None = None
     firmware_midi: str | None = None
-    # Latest available firmware from the device's backend check (, MQTT
+    # Latest available firmware from the device's own update check (MQTT
     # .../update). None until the device has reported; the update entity then
     # falls back to a maintained constant.
     latest_audio: str | None = None

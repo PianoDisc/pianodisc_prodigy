@@ -8,8 +8,6 @@ split status topics plus the composed HTTP poll.
 * ``…/busy`` → instant "playing" (HTTP then confirms + sustains it through busy's gaps),
 * ``…/player/status`` → full now-playing snapshot,
 * ``…/ready`` / any message → availability (watchdog-driven offline).
-
-See , .
 """
 
 from __future__ import annotations
@@ -290,7 +288,7 @@ class MqttTransport(Transport):
 
     @callback
     def _avail(self, msg: ReceiveMessage) -> bool:
-        # : these status topics are now published retained, so the broker replays
+        # These status topics are published retained, so the broker replays
         # them on every (re)subscribe — including while the device is offline. A
         # retained replay is last-known state, NOT proof the device is online now, so
         # it must preserve availability and leave …/ready (+ its Last-Will) and the
@@ -377,8 +375,8 @@ class MqttTransport(Transport):
 
         raw_state = _int_value(payload.get("state"))
         state = _STATE_MAP.get(raw_state) if raw_state is not None else None
-        # The ESP retains player/status across an NRF reboot. A bare PAUSED state
-        # with no observed playback is stale cache, not a paused song.
+        # An old player/status can survive a piano restart. A bare PAUSED state with
+        # no observed playback is stale cache, not a paused song.
         if (
             state is MediaPlayerState.PAUSED
             and not self._playback_seen
@@ -539,7 +537,7 @@ class MqttTransport(Transport):
 
     @callback
     def _on_volume(self, msg: ReceiveMessage) -> None:
-        # : new firmware publishes percent here (matching /getVolume). Older
+        # Current firmware publishes percent here (matching /getVolume). Older
         # firmware sometimes emits raw MIDI-ish values; values outside HA's percent
         # range, including the boot-time 255 sentinel, remain unknown and the HTTP poll
         # keeps acting as the authoritative correction path.
@@ -551,7 +549,7 @@ class MqttTransport(Transport):
 
     @callback
     def _on_version(self, msg: ReceiveMessage) -> None:
-        # : retained {"audio": "x.y.z", "midi": "x.y.z"} — the firmware version
+        # Retained {"audio": "x.y.z", "midi": "x.y.z"} — the firmware version
         # over MQTT, so an MQTT-only install (no HTTP /debugJson) still populates
         # the device's sw_version. Empty strings mean "not known yet"; skip them.
         try:
@@ -576,8 +574,8 @@ class MqttTransport(Transport):
 
     @callback
     def _on_update(self, msg: ReceiveMessage) -> None:
-        # : retained {"audio_latest","midi_latest","audio_url","midi_url"} — the
-        # latest firmware the device's own backend check found. Feeds the update
+        # Retained {"audio_latest","midi_latest","audio_url","midi_url"} — the
+        # latest firmware the device's own update check found. Feeds the update
         # entity's latest_version. Metadata (retained), so don't touch availability.
         try:
             payload = _json_payload(msg.payload)
@@ -643,15 +641,15 @@ class MqttTransport(Transport):
 
     @callback
     def _on_ready(self, msg: ReceiveMessage) -> None:
-        """Apply the NRF-owned playback readiness reported by the ESP gateway."""
+        """Apply the playback readiness the piano reports on .../ready."""
         readiness = str(msg.payload).strip().upper()
         self._mark_mqtt_live(msg)
         if readiness == MQTT_PAYLOAD_OFFLINE:
             self._mqtt_last_live_at = None
             self._push(available=False, readiness="OFFLINE")
             return
-        # Older firmware reports OK. New firmware distinguishes a reachable gateway
-        # from a piano that has completed its MIDI and SD-card startup work.
+        # Older firmware reports OK. New firmware distinguishes a reachable piano
+        # from one that has completed its MIDI and SD-card startup work.
         self._push(
             available=(
                 readiness in {"READY", "OK"}
@@ -868,7 +866,7 @@ class MqttTransport(Transport):
         return await self._http.async_fetch_playlists()
 
     async def async_play(self, index: int | None = None) -> None:
-        # Verified live (2026-06-03): {"exec":"Play","params":N} is 0-based.
+        # {"exec":"Play","params":N} is 0-based.
         self._playback_seen = True
         if index is None and self._data.state is MediaPlayerState.PAUSED:
             self._optimistic_resume()
@@ -891,7 +889,7 @@ class MqttTransport(Transport):
         self._push()
 
     async def async_play_path(self, path: str, *, single: bool = False) -> None:
-        """Ask the NRF to resolve a path against its current SD-card library."""
+        """Ask the piano to resolve a path against its current SD-card library."""
         self._playback_seen = True
         self._last_song_path = path
         self._optimistic_new_song()

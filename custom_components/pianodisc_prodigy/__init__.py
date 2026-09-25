@@ -62,7 +62,7 @@ PLATFORMS: list[Platform] = [
 
 SERVICE_GET_DEBUG_INFO = "get_debug_info"
 
-# The macOS companion app keeps ES modules by URL. Bump this whenever either
+# Home Assistant's macOS Companion app keeps ES modules by URL. Bump this whenever either
 # Lovelace card changes so it cannot revive an old custom-element definition.
 _CARD_RESOURCE_REVISION = "5"
 
@@ -146,7 +146,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) ->
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Do not probe the SD card until the NRF reports that MIDI and its own initial
+    # Do not probe the SD card until the piano reports that MIDI and its own initial
     # scan are complete. A retained READY received during setup is already reflected
     # in coordinator.data; later transitions are handled by the coordinator push path.
     if coordinator.data.available:
@@ -338,7 +338,7 @@ async def _async_reload_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) 
 async def _async_build_transport(
     hass: HomeAssistant, entry: PianoDiscConfigEntry
 ) -> Transport:
-    """Select the transport for this entry (design: hybrid mode).
+    """Select the transport for this entry (hybrid mode).
 
     MQTT is preferred (push / ``local_push``). The HTTP transport composes into the
     MQTT one for the request/library half MQTT lacks — song list, playlists, firmware

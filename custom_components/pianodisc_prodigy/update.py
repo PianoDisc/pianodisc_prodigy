@@ -1,13 +1,12 @@
 """Firmware update entities — the certification "update available" signal.
 
- (minimum): surface installed vs. recommended firmware so Home Assistant
-shows whether an update is available. Installed comes from the device (…/version
+Surface installed vs. recommended firmware so Home Assistant shows whether an
+update is available. Installed comes from the device (…/version
 over MQTT, or /debugJson over HTTP); the recommended ("latest") version is a
 maintained constant for now.
 
-Read-only on purpose: a real HA-triggered install needs the firmware binary URL
-from the PianoDisc backend (a separate firmware task), so no INSTALL feature is
-advertised yet — this entity is the "update available" indicator only.
+Read-only on purpose: firmware is installed with the PianoDisc Calibrate App, so no
+INSTALL feature is advertised — this entity is the "update available" indicator only.
 """
 
 from __future__ import annotations
@@ -69,7 +68,7 @@ class PianoDiscFirmwareUpdate(PianoDiscEntity, UpdateEntity):
 
     @property
     def latest_version(self) -> str | None:
-        # Prefer the device's own backend check (, MQTT .../update); fall back
+        # Prefer the device's own update check (MQTT .../update); fall back
         # to the maintained constant until the device has reported (e.g. HTTP-only).
         data = self.coordinator.data
         dynamic = data.latest_audio if self._kind == "audio" else data.latest_midi

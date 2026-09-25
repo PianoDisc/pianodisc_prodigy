@@ -70,7 +70,7 @@ You'll need the IP address of your Home Assistant server, which is shown under
 4. Click **Save**, then **Apply**.
 5. Restart the piano.
 
-![The Prodigy II settings screen, showing the MQTT Broker section of the System page](images/MQTT_Settings.png)
+![The Prodigy II settings screen, showing the MQTT Broker section of the System page](images/mqtt-settings.png)
 
 Each field shows its **Previous value** underneath, which is useful for checking what was
 there before you change anything.

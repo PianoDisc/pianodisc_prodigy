@@ -1,10 +1,10 @@
 """HTTP transport — the full control surface over the device's LAN HTTP API.
 
 This powers HTTP-only mode (poll + command + library) and is also composed by the
-MQTT transport for the request/library half MQTT lacks. Per  the
-endpoints are unauthenticated, return ``text/plain`` even for JSON (parse by path),
+MQTT transport for the request/library half MQTT lacks. The endpoints are
+unauthenticated, return ``text/plain`` even for JSON (parse by path),
 and the library/status GETs are *prime-then-poll* async caches with no completion
-signal. Decoding mirrors the Calibrate app: ISO-8859-1 then strip control bytes.
+signal. Responses are decoded as ISO-8859-1 with control bytes stripped.
 """
 
 from __future__ import annotations
@@ -130,7 +130,7 @@ class HttpTransport(Transport):
                     raw = await resp.read()
             except (TimeoutError, ClientError, OSError):
                 return None
-        # ISO-8859-1 + strip control bytes before parsing (matches Calibrate).
+        # ISO-8859-1 + strip control bytes before parsing.
         text = raw.decode("iso-8859-1", "replace")
         return "".join(ch for ch in text if ord(ch) >= 0x20)
 
@@ -166,7 +166,7 @@ class HttpTransport(Transport):
     async def async_fetch_debug_json(self) -> dict[str, Any] | None:
         """Refresh then retrieve the full piano diagnostic JSON on user request."""
         # The firmware returns its existing cache from the prime request; a
-        # subsequent GET is needed after the nRF has answered over UART.
+        # subsequent GET is needed once the piano has refreshed it.
         await self._get_json("debugJson?type=request")
         for _ in range(4):
             await self._sleep(PRIME_POLL_WAIT)
@@ -256,8 +256,8 @@ class HttpTransport(Transport):
             media_position_updated_at=(
                 dt_util.utcnow() if media_position is not None else None
             ),
-            # 0-100 percent; the audio engine returns 255 ("unknown") for ~1 min after
-            # boot until it syncs with the MIDI engine — treat out-of-range as unknown.
+            # 0-100 percent; the piano returns 255 ("unknown") for ~1 min after boot
+            # — treat out-of-range as unknown.
             volume=vol if isinstance(vol, int) and 0 <= vol <= 100 else None,
             shuffle=self._resolve_shuffle(shuffle),
             queue_mode=queue_mode,
@@ -393,8 +393,8 @@ class HttpTransport(Transport):
         differs from the previous page. A non-advance is *ambiguous* — a slow load, a
         dropped scan command, or a buffer that already holds this page — and is **never**
         proof of end-of-library, so we re-prime and retry ``SCAN_PAGE_ATTEMPTS`` times
-        before giving up on the page. Cadence mirrors the reference Calibrate app
-        (````): gentle ``SCAN_POLL_INTERVAL`` polls, not a tight loop.
+        before giving up on the page. Polls are gentle (``SCAN_POLL_INTERVAL``), not a
+        tight loop.
 
         Returns the new page's paths, or ``None`` if the buffer never advances.
         """
@@ -419,8 +419,7 @@ class HttpTransport(Transport):
         ``/songlist`` is a single shared buffer with no completion signal, so each page
         is read by polling until the buffer advances (see ``_scan_one_page``) rather than
         waiting a fixed time — a fixed wait reads the stale buffer and truncates the
-        library (verified live). Termination and cadence mirror the reference Calibrate
-        app: the SCAN ends **only** on a short/empty page (< SONGLIST_PAGE_SIZE) or the
+        library. The SCAN ends **only** on a short/empty page (< SONGLIST_PAGE_SIZE) or the
         MAX_SCAN_PAGES cap — a buffer that stops advancing is *not* treated as the end
         (that truncated the library under load, and lost everything when the buffer
         already held page 0). On a page-0 non-advance we fall back to the current buffer

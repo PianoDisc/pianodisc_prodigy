@@ -1,7 +1,7 @@
 """Diagnostic sensor: the SD-library song count / scan status.
 
 Firmware versions no longer have standalone sensors — they are surfaced by the
-device's ``sw_version`` and the  ``update`` entities (which show the installed
+device's ``sw_version`` and the ``update`` entities (which show the installed
 version plus whether a newer build is available), so a separate version sensor
 would just duplicate the update entity's name and confuse users.
 """
@@ -129,13 +129,13 @@ class PianoDiscPlaylistStatusSensor(PianoDiscEntity, SensorEntity):
 
 
 class PianoDiscStatusSensor(PianoDiscEntity, SensorEntity):
-    """Report whether the NRF has completed its safe-to-play startup work."""
+    """Report whether the piano has completed its safe-to-play startup work."""
 
     _attr_translation_key = "status"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_icon = "mdi:piano"
-    # The words the MIDI engine reports (relayed by the ESP32 on .../ready), as
+    # The words the piano reports on .../ready, as
     # lowercase enum options. OFFLINE is the MQTT last-will. Anything else is unknown.
     _attr_options = ["warming_up", "ready", "offline", "no_sd", "fault"]
 
@@ -164,7 +164,7 @@ class PianoDiscStatusSensor(PianoDiscEntity, SensorEntity):
 
 
 class PianoDiscIpAddressSensor(PianoDiscEntity, SensorEntity):
-    """Expose the current LAN address advertised by the ESP over MQTT."""
+    """Expose the current LAN address the piano advertises over MQTT."""
 
     _attr_translation_key = "ip_address"
     _attr_entity_category = EntityCategory.DIAGNOSTIC

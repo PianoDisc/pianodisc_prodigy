@@ -173,7 +173,7 @@ class Transport(ABC):
 
     @abstractmethod
     async def async_reboot(self) -> None:
-        """Reboot the device (only device-side power action)."""
+        """Reboot the device (the only device-side power action)."""
 
     # -- library reads (prime-then-poll on real hardware) -------------------
     @abstractmethod

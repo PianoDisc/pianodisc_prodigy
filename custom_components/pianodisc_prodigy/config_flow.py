@@ -215,7 +215,7 @@ class PianoDiscConfigFlow(ConfigFlow, domain=DOMAIN):
         """Resolve ``(device_id, default_name)`` from a host over HTTP.
 
         ``GET /debugJson?type=request`` is the only HTTP source of the Prodigy protocol
-        deviceID and both firmware versions (see ). Never key on the
+        deviceID and both firmware versions. Never key on the
         editable ``device_name`` — it is the generic "Prodigy2" on ``/status.json``.
         """
         transport = HttpTransport(async_get_clientsession(self.hass), host)
