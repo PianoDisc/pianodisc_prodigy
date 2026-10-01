@@ -3,6 +3,8 @@
 ## Unreleased (0.2.1)
 
 - Released under the Apache License 2.0 (see `LICENSE`).
+- The integration is set up from the UI only, and Home Assistant now says so: a
+  `pianodisc_prodigy:` entry in `configuration.yaml` is reported as unsupported.
 
 ## v0.2.0 - 2026-09-25
 

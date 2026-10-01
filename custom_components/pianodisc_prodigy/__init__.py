@@ -49,6 +49,8 @@ from .transports.http import HttpTransport
 from .transports.mqtt import MqttTransport
 from .websocket import async_register_websocket_api
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 PLATFORMS: list[Platform] = [
     Platform.MEDIA_PLAYER,
     Platform.BINARY_SENSOR,
