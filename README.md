@@ -424,3 +424,8 @@ To remove the files as well, open HACS, find **PianoDisc Prodigy II**, and choos
 
 Nothing is changed on the piano itself — its SD card, playlists and settings are left
 exactly as they are.
+
+## License
+
+This integration is released under the [Apache License 2.0](LICENSE). The license does
+not cover the PianoDisc name or logo.

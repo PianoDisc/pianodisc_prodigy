@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased (0.2.1)
+
+- Released under the Apache License 2.0 (see `LICENSE`).
+
 ## v0.2.0 - 2026-09-25
 
 - **Beta.** The integration moves from alpha to beta. The README explains how to update
