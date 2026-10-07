@@ -31,7 +31,10 @@ from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 
 from .const import (
     CONF_DEVICE_ID,
+    CONF_HIDE_POWER_SWITCH,
     CONF_NETWORK_MAC,
+    CONF_POWER_SWITCH,
+    DEFAULT_HIDE_POWER_SWITCH,
     DATA_COORDINATORS,
     DOMAIN,
     LOGGER,
@@ -44,6 +47,7 @@ from .coordinator import (
     PianoDiscCoordinator,
     _format_device_sw_version,
 )
+from .power_outlet import async_release_outlet, async_take_over_outlet
 from .transports import Transport
 from .transports.http import HttpTransport
 from .transports.mqtt import MqttTransport
@@ -147,6 +151,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) ->
     # coordinator re-reads it and the media_player recomputes its supported features.
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    if (outlet := _hidden_outlet(entry)) is not None:
+        async_take_over_outlet(hass, entry, outlet)
 
     # Do not probe the SD card until the piano reports that MIDI and its own initial
     # scan are complete. A retained READY received during setup is already reflected
@@ -326,15 +332,37 @@ def _async_sync_msc_registry(
     device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, show_control_id)},
-        via_device=(DOMAIN, device_id),
+        via_device_id=piano.id,
         manufacturer=MANUFACTURER,
         name=f"{piano.name or entry.title} Show Control",
     )
 
 
+def _hidden_outlet(entry: PianoDiscConfigEntry) -> str | None:
+    """The linked outlet entity_id when the options ask for it to be hidden."""
+    outlet = entry.options.get(CONF_POWER_SWITCH) or None
+    if outlet is None:
+        return None
+    if not entry.options.get(CONF_HIDE_POWER_SWITCH, DEFAULT_HIDE_POWER_SWITCH):
+        return None
+    return outlet
+
+
 async def _async_reload_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> None:
     """Reload the entry when its options change (e.g. the linked power outlet)."""
+    # The coordinator still holds the outlet the previous options named. Give it
+    # back before the new options take effect, unless it stays hidden.
+    coordinator = getattr(entry, "runtime_data", None)
+    previous = getattr(coordinator, "power_switch", None)
+    if previous is not None and previous != _hidden_outlet(entry):
+        async_release_outlet(hass, entry, previous)
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: PianoDiscConfigEntry) -> None:
+    """Give the power outlet back to the user when the piano is removed."""
+    if (outlet := entry.options.get(CONF_POWER_SWITCH)) is not None:
+        async_release_outlet(hass, entry, outlet)
 
 
 async def _async_build_transport(

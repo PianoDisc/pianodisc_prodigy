@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import (
     CONNECTION_NETWORK_MAC,
     DeviceInfo,
@@ -60,6 +61,17 @@ class PianoDiscEntity(CoordinatorEntity[PianoDiscCoordinator]):
         return super().available and self.coordinator.data.available
 
 
+def _piano_device_id(coordinator: PianoDiscCoordinator, device_id: str) -> str | None:
+    """Registry id of the piano device, the parent of the sub-devices below.
+
+    The piano device is created before the platforms load, so it is normally found.
+    """
+    device = dr.async_get(coordinator.hass).async_get_device(
+        identifiers={(DOMAIN, device_id)}
+    )
+    return device.id if device is not None else None
+
+
 class PianoDiscShowControlEntity(PianoDiscEntity):
     """Entity on the piano's Show Control sub-device."""
 
@@ -70,10 +82,11 @@ class PianoDiscShowControlEntity(PianoDiscEntity):
         piano_name = coordinator.data.device_name or entry.title
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{device_id}_show_control")},
-            via_device=(DOMAIN, device_id),
             manufacturer=MANUFACTURER,
             name=f"{piano_name} Show Control",
         )
+        if (parent := _piano_device_id(coordinator, device_id)) is not None:
+            self._attr_device_info["via_device_id"] = parent
 
 
 class PianoDiscAutoPlayEntity(PianoDiscEntity):
@@ -90,7 +103,8 @@ class PianoDiscAutoPlayEntity(PianoDiscEntity):
         piano_name = coordinator.data.device_name or entry.title
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{device_id}_autoplay")},
-            via_device=(DOMAIN, device_id),
             manufacturer=MANUFACTURER,
             name=f"{piano_name} AutoPlay",
         )
+        if (parent := _piano_device_id(coordinator, device_id)) is not None:
+            self._attr_device_info["via_device_id"] = parent

@@ -41,10 +41,12 @@
         "description": "Link the outlet or controller that powers this piano so Home Assistant can turn it on and off. Only link an outlet dedicated to the piano. Leave it empty to disable power control.",
         "data": {
           "power_switch": "Power outlet",
+          "hide_power_switch": "Hide the outlet's own entity",
           "msc_channels": "Show control channels"
         },
         "data_description": {
           "power_switch": "A switch, smart plug, outlet, or input boolean that controls power to the piano.",
+          "hide_power_switch": "Hide the outlet's own switch and let voice assistants reach power through the piano instead, so \"turn on the piano\" works even when the outlet shares the piano's name. The outlet is shown again if you turn this off or remove the piano.",
           "msc_channels": "Number of MIDI Show Control channels. Set to 0 to remove channel entities; higher cues still reach the pianodisc_prodigy_msc event."
         }
       }

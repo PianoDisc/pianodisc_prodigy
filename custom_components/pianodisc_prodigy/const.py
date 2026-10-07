@@ -19,6 +19,9 @@ CONF_DEVICE_ID: Final = "device_id"
 CONF_NETWORK_MAC: Final = "network_mac"
 # optional dedicated-outlet link (off by default)
 CONF_POWER_SWITCH: Final = "power_switch"
+# hide the outlet's own entity and move its voice exposure to the media player
+CONF_HIDE_POWER_SWITCH: Final = "hide_power_switch"
+DEFAULT_HIDE_POWER_SWITCH: Final = True
 CONF_MSC_CHANNELS: Final = "msc_channels"
 DEFAULT_MSC_CHANNELS: Final = 8
 MAX_MSC_CHANNELS: Final = 32

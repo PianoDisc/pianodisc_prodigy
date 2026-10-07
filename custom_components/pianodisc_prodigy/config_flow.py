@@ -39,7 +39,9 @@ from .const import (
     CONF_DEVICE_ID,
     CONF_MSC_CHANNELS,
     CONF_NETWORK_MAC,
+    CONF_HIDE_POWER_SWITCH,
     CONF_POWER_SWITCH,
+    DEFAULT_HIDE_POWER_SWITCH,
     DEFAULT_MSC_CHANNELS,
     DOMAIN,
     MANUFACTURER,
@@ -245,11 +247,19 @@ class PianoDiscOptionsFlow(OptionsFlow):
             }
             if user_input.get(CONF_POWER_SWITCH):
                 data[CONF_POWER_SWITCH] = user_input[CONF_POWER_SWITCH]
+                data[CONF_HIDE_POWER_SWITCH] = bool(
+                    user_input.get(CONF_HIDE_POWER_SWITCH, DEFAULT_HIDE_POWER_SWITCH)
+                )
             return self.async_create_entry(
                 title="", data=data
             )
 
         current = self.config_entry.options.get(CONF_POWER_SWITCH)
+        current_hide = bool(
+            self.config_entry.options.get(
+                CONF_HIDE_POWER_SWITCH, DEFAULT_HIDE_POWER_SWITCH
+            )
+        )
         current_msc = int(
             self.config_entry.options.get(CONF_MSC_CHANNELS, DEFAULT_MSC_CHANNELS)
         )
@@ -261,6 +271,9 @@ class PianoDiscOptionsFlow(OptionsFlow):
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain=_POWER_SWITCH_DOMAINS)
                 ),
+                vol.Required(
+                    CONF_HIDE_POWER_SWITCH, default=current_hide
+                ): selector.BooleanSelector(),
                 vol.Required(CONF_MSC_CHANNELS, default=current_msc): selector.NumberSelector(
                     selector.NumberSelectorConfig(
                         min=0,

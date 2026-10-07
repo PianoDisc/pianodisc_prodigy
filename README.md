@@ -25,7 +25,7 @@ edit playlists from your own dashboard.
 
 [![Release](https://img.shields.io/github/v/release/PianoDisc/pianodisc_prodigy?style=flat-square)](https://github.com/PianoDisc/pianodisc_prodigy/releases)
 [![HACS custom repository](https://img.shields.io/badge/HACS-Custom-41BDF5?style=flat-square)](https://hacs.xyz/)
-[![Home Assistant 2026.3+](https://img.shields.io/badge/Home%20Assistant-2026.3%2B-41BDF5?style=flat-square)](https://www.home-assistant.io/)
+[![Home Assistant 2026.8+](https://img.shields.io/badge/Home%20Assistant-2026.8%2B-41BDF5?style=flat-square)](https://www.home-assistant.io/)
 
 <!-- SCREENSHOT: hero — the media player card mid-playback -->
 
@@ -33,7 +33,7 @@ edit playlists from your own dashboard.
 
 You need:
 
-- **Home Assistant 2026.3** (or newer)
+- **Home Assistant 2026.8** (or newer)
 - **HACS** — if you don't have it yet, follow the
   [official HACS download guide](https://www.hacs.xyz/docs/use/download/download/)
 - Your **Prodigy II powered on** and connected to the same network as Home Assistant
@@ -282,7 +282,14 @@ Turning the outlet on starts the piano; reconnection, readiness, library sync, a
 configured AutoPlay happen in the background.
 
 A play command sent while the piano is off turns the outlet on and waits for the piano to
-become ready before playing. The linked outlet's own switch keeps working as before.
+become ready before playing.
+
+**Voice control.** By default the outlet's own switch is hidden and its voice-assistant
+exposure (Assist, Alexa, Google) moves to the piano's media player, so "turn on the piano"
+and "turn off the piano" control power even when the outlet is named after the piano. Turn
+off **Hide the outlet's own entity** in the options to keep the switch visible; the switch is
+restored when you do, or when you remove the piano. Pause, resume, next, previous, stop, and
+volume commands use Home Assistant's standard media player intents.
 
 `off` means the linked outlet reports that power is cut. `unavailable` means Home Assistant
 cannot determine the linked outlet's state, or the piano itself is not ready for playback.
